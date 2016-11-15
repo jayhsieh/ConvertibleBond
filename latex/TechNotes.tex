@@ -1,11 +1,109 @@
-%document for convertible bond
 \documentclass[12pt]{article}
-
+\usepackage{axioma}
+\usepackage{amsmath}
 \begin{document}
-\title{Implementation of convertible bond pricing}
+\title{Implementation of convertible bond pricer with credit risk using PDE model}
 \author{Zheng Gao}
 \maketitle
 
-Describe equations below
+\section{Introduction}
+Convertible bonds ($CB$) have been around for more than a century. It is a security in which the investor can convert the instrument into a predefined number of shared of the company that issued the bond. The conversion is not mandatory and is an option for the investor. The final payoff of the convertible bond is written as:
+\begin{equation}
+V^* = max(F, C_rS)
+\end{equation}
+At maturity, the holder has the right to swap the face value $F$ of the bond for
+ $C_r$ shared with price $S$, where $C_r$ is the conversion ratio. Most convertibles are American-style in their conversion possibilities: converting the bond into shares is not limited to the maturity date only, but may happen during a predefined conversion period. In addition to conversion feature, there is also a possibility for the bond to be called by the issuer and to be put by the investor. The moment the bond gets called, the investor can sill convert into shares even not in the conversion interval. 
+
+The difficulty for solving the Black-Scholes equation for $CB$ is that one can hardly assign a predetermined value to the credit spread $r_c$. If the easily observable credit spread implied by a similar non-convertible bond of the same issuer were used for $r_c$, one would unnecessarily penalize the risk-free equity upside of the CB.
+
+An feasible method was proposed by \cite{Tsiveriotis1998}, in which the authors defined a related security, that is the "cash-only" part of the $CB$ and we will refer to as $COCB$. The price of $COCB$ is a derivative of the stock $S$, and thus should follow the Black-Scholes equation as does the $CB$ value. This leads to a new formulation of the $CB$ valuation problems as a system of two coupled Black-Scholes equation:
+\begin{equation}
+CB: \frac{\partial{U}}{\partial{t}} + 
+\frac{\sigma^2S^2}{2}\frac{\partial^2{U}}{\partial{S}^2} + r_gS\frac{\partial{U}}{\partial{S}} - r(U-V) - (r+r_c)V + f(t) = 0 
+\label{eq:CB}
+\end{equation}
+
+\begin{equation}
+COCB: \frac{\partial{V}}{\partial{t}} + 
+\frac{\sigma^2S^2}{2}\frac{\partial^2{V}}{\partial{S}^2} + r_gS\frac{\partial{V}}{\partial{S}} - (r+r_c)V + f(t) = 0 
+\label{eq:COCB}
+\end{equation}
+where $U$ is the value of $CB$, $V$ is the value of $COCB$; $r_c$ here becomes the observable credit spread implied by the non-convertible bonds of the same issuer for $CB$; $S$ is the price of the underlying stock; $r$ is the risk-free rate; $r_g$ is the growth rate of the stock; and $f(U,s,t)$ denotes the bond paying coupons $c_i$ at $t_i$:
+\begin{equation}
+f(U,S,t) = \Sigma c_i\delta(t-t_i)
+\label{eq:coupon}
+\end{equation}
+where $\delta(x)$ is the Dirac function, that is $\delta(x)$ equals $1$ at $x = 0$ and equal to $1$ elsewhere.
+
+The initial condition as well as boundary constrains are defined below:
+Final conditions at maturity:
+\begin{eqnarray}
+U = C_r S, V = 0\text{, if } S \ge F/C_r\\
+U = F, V = F\text{, elsewhere }
+\end{eqnarray}
+
+Upside constraints due to conversion 
+\begin{eqnarray}
+U \ge C_r S\\
+V = 0 \text{, if } U \le C_r S
+\end{eqnarray}
+
+Upside constrains due to callability by the CB issuer when $t\in \Omega_{call}$
+\begin{eqnarray}
+U \le \max(B_c, C_rS)\\
+V = 0 \text{, if } U \ge B_c
+\end{eqnarray}
+
+Downside constrains due to putability by the investor when $t \in \Omega_{put}$:
+\begin{eqnarray}
+U \ge B_p \\
+V = B_p \text{, if } U \le B_p
+\end{eqnarray} 
+
+\section{Numerical Scheme}
+Notice that Equation \ref{eq:CB} and \ref{eq:COCB} are derived from American-style derivatives, and therefore results in a set of fully coupled free-boundary problems. Although Equation \ref{eq:COCB} appears to be independent of \ref{eq:CB}, they are actually tightly coupled to each other due to the free boundaries introduced by $CB$ and equation \ref{eq:CB} and \ref{eq:COCB} are not valid beyond these boundaries. To solve these fully coupled parabolic equations with free boundaries, Equation \ref{eq:CB} and \ref{eq:COCB} are firstly discretized using common numerical schemes, such as Forward Time Centered Space (FTCS), Backward in Time Centered in Space (BTCS) and Crank-Nicholson(CN). Then the resulting linear system is solved with Projected Successive Over-relaxation (PSOR) method by considering the conversion, putt-ability and call-ability during each iteration step. To simplify the implementation, we gives the discretized form for a generalized B-S equation:
+\begin{equation}
+\frac{\partial{U}}{\partial{t}} + 
+c_2S^2\frac{\partial^2{U}}{\partial{S}^2} + c_1S\frac{\partial{U}}{\partial{S}} + c_0U + f(t) = 0 \label{eq:BS}
+\end{equation}
+where $U$ is the unknown solution, $c_2$ is the coefficient for second order term, $c_1$ for the first order term, $c_0$ for the zero order term, and $f(t)$ denotes the source term to the PDE. Let $U^n_i$ denote numerical solution to Equation \ref{eq:BS} at $S = S_i = S_0 + i \Delta S$ and $t = t_n = t_0 + n \Delta t$, the discretized form is derived as:
+\begin{eqnarray*}
+[1 + (\alpha_{i}+\beta_{i} - c_0 \Delta t)\theta] U_i^n 
+- (\alpha_i U_{i-1}^n + \beta_i U_{i+1}^n)\theta \\
+= [1 - (\alpha_i+\beta_i - c_0 \Delta t)(1-\theta)] U_i^{n+1} 
++ (\alpha_i U_{i-1}^{n+1} 
++ \beta_i U_{i+1}^{n+1})(1-\theta) + f_i \Delta t
+\end{eqnarray*}
+where
+\begin{eqnarray}
+\alpha_i = (\frac{c_2S_i^2}{\Delta S^2} - \frac{c_1S_i}{\Delta S})\Delta t\\
+\beta_i =  (\frac{c_2S_i^2}{\Delta S^2} + \frac{c_1S_i}{\Delta S})\Delta t
+\end{eqnarray}
+The parameter $theta$ is used to generalize to different schemes, $\theta = 0$ for FTCS, $\theta = 1$ for BTCS and $\theta = 0.5$ for CN methods. Since the equation is solved backwards from maturity, the above equation is solved for $U^{n}$ from $U^{n+1}$.
+
+The above formula results a tridiagonal linear system to be solved at every time step:
+\begin{equation}
+(\mathbf{I} + \theta \mathbf{M}) \mathbf{U}^{n} = (\mathbf{I} - (1-\theta)\mathbf{M})\mathbf{U}^{n+1} + \mathbf{f}\Delta t
+\end{equation}
+where
+\begin{equation}
+\mathbf{M} = 
+\begin{bmatrix}
+0         & 0        & 0 		  & \dots & 0\\
+-\alpha_1 & \alpha_1 + \beta_1 - c_0\Delta t & -\beta_1 & \dots & 0\\
+0         & -\alpha_2  & \alpha_2 + \beta_1 - c_0\Delta t & \dots & 0 \\                 
+\vdots & \vdots & \vdots & \ddots & -\beta_{m-1} \\
+0 & 0 & 0 & \dots & 0
+\end{bmatrix}
+\end{equation}
+For Equation \ref{eq:CB}, $c_2 = \sigma^2/2$, $c_1 = r_g$, $c_0 = -r$ and $\mathbf{f} = -r_c \mathbf{V}$, and for Equation \ref{eq:COCB}, $c_2 = \sigma^2/2$, $c_1 = r_g$, $c_0 = -(r+r_c)$ and $\mathbf{f} = \mathbf{0}$.
+
+The PSOR iteration is to solve the problem of $Ax = b$ with constrains, 
+where $A = (I + \theta M)$ and $(\mathbf{I} - (1-\theta)\mathbf{M})\mathbf{U}^{n+1} + \mathbf{f}\Delta t$.
+The iteration procedure is described as follows. For each $x_i$ in the solution space:
+\begin{equation}
+x_i^{k+1} = (1-\omega)x_i^{k} + \frac{\omega}{a_{ii}}(b_i - \Sigma a_{ij}x_{j}^{(k+1)} - \Sigma_{j > i}a_{ij}x_j^{k})
+\end{equation}
+\section{Numerical Results}
 
 \end{document}

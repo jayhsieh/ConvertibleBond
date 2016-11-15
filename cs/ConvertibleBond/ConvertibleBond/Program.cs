@@ -25,9 +25,9 @@ namespace LCP
             double Bp_clean = 105;
             double Bc = Bc_clean;
             double Bp = Bp_clean;
-            double[] CallInterval = new double[2] {1, 5};
-            double[] PutInterval = new double[2] {2, 3};
-            double F  = 100;
+            double[] CallInterval =  new double[2] {1, 5};
+            double[] PutInterval =  new double[2] {2, 3};
+            double F  = 101;
             double Coupon = 4;
             double kappa = 1.0;
             double T = 5;
@@ -65,7 +65,7 @@ namespace LCP
                     cocb[i] = 0;
                 }
 
-                //downside constrain due to pullability  
+                //downside constrain due to puttability  
                 if (cb[i] < Bp) {
                     cb[i] = Bp;
                     cocb[i] = Bp;
@@ -109,29 +109,29 @@ namespace LCP
                 //update coefficients
 
                 //update call price
-                /*if (t >= PutInterval[0] && t <= PutInterval[1])
+                if (PutInterval != null && t >= PutInterval[0] && t <= PutInterval[1])
                     Bp = Bp_clean + AccI(t, coupon_dates, Coupon);
-                else*/
+                else
                     Bp = 0;
 
                 //update put price
-                /*if (t >= CallInterval[0] && t <= CallInterval[1])
+                if (CallInterval != null && t >= CallInterval[0] && t <= CallInterval[1])
                     Bc = Bc_clean + AccI(t, coupon_dates, Coupon);
-                else*/
+                else
                     Bc = double.MaxValue;
 
                 //advance solution
                 solver.advance(dt);
 
                 //compute Coupon between [t-dt, t];
-                /*while (coupon_index >= 0 && coupon_dates[coupon_index] >= t - dt && coupon_dates[coupon_index] <= t) {
+                while (coupon_index >= 0 && coupon_dates[coupon_index] >= t - dt && coupon_dates[coupon_index] <= t) {
                     Console.WriteLine("Paying coupon {0} at {1}", Coupon, coupon_dates[coupon_index]);
                     for (int i = 0; i < CB.Length; ++i) {
                         CB[i] += Coupon;
                         COCB[i] += Coupon;
                     }
                     coupon_index--;
-                }*/
+                }
                 t = t - dt;
                 Console.WriteLine("t = {0}, dt = {1}", t, dt);
                 Console.WriteLine("price(100) = {0}", solver.getPrice(bs[0], 100));
@@ -337,7 +337,7 @@ namespace LCP
             psor_solver.tolerance = Math.Min(dt, min_dx) * 0.01;
             psor_solver.maxIter = 200;
             psor_solver.solve();
-            Console.WriteLine("Iteration: {0}, Error Norm: {1}", psor_solver.NumIter, psor_solver.ErrorNorm);
+            //Console.WriteLine("Iteration: {0}, Error Norm: {1}", psor_solver.NumIter, psor_solver.ErrorNorm);
         }
 
         void applyBoundaryCondition(BlkSch bs, BoundaryCondition bc, double[] coef, double[] rhs, double[] x, DIR dir) {
