@@ -18,7 +18,7 @@ namespace LCP
             double sigma = 0.2;
             double rc = 0.2;
             double r = 0.05;
-            double rg = 0.02;
+            double rg = 0.065;
             double[] coupon_dates = new double[10];
             linspace(coupon_dates, 0.5, 5, 10);
             double Bc_clean = 110;
@@ -35,14 +35,14 @@ namespace LCP
             double[] CB = new double[N];
             double[] COCB = new double[N];
             double[] x = new double[N];
-            linspace(x, 0, 2*F, N);
+            linspace(x, 0, 5*F, N);
 
             BlkSch[] bs = new BlkSch[2];
             //construct Black Scholes equation for CB
             BoundaryCondition[] CB_bc = new BoundaryCondition[2];
             CB_bc[0] = new BoundaryCondition(); CB_bc[1] = new BoundaryCondition();
             CB_bc[0].bc_type = BoundaryCondition.BC_Type.ZeroS;
-            CB_bc[1].bc_type = BoundaryCondition.BC_Type.LargeS;
+            CB_bc[1].bc_type = BoundaryCondition.BC_Type.Dirichlet;
             CB_bc[1].bc_values[0] = kappa * x.Last(); 
             double[] minus_rcB = new double[N];
             bs[0] = new BlkSch(CB, x, 0.5*sigma*sigma, rg, -r, minus_rcB, CB_bc);
@@ -51,7 +51,7 @@ namespace LCP
             BoundaryCondition[] COCB_bc = new BoundaryCondition[2];
             COCB_bc[0] = new BoundaryCondition(); COCB_bc[1] = new BoundaryCondition();
             COCB_bc[0].bc_type = BoundaryCondition.BC_Type.ZeroS;
-            COCB_bc[1].bc_type = BoundaryCondition.BC_Type.LargeS;
+            COCB_bc[1].bc_type = BoundaryCondition.BC_Type.Dirichlet;
             COCB_bc[1].bc_values[0] = 0;
             bs[1] = new BlkSch(COCB, x, 0.5 * sigma * sigma, rg, -(r + rc), null, COCB_bc);
 

@@ -4,7 +4,7 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import matplotlib.pyplot as plt
 import numpy as np
 
-CBprice = np.loadtxt('D:/ConvtBonds/c#/ConsoleApplication6/bin/Debug/COCBsol.txt')
+CBprice = np.loadtxt('D:/ConvertibleBond/cs/ConvertibleBond/ConvertibleBond/bin/Debug/COCBsol.txt')
 CBprice = np.matrix.transpose(CBprice)
 
 fig = plt.figure()
