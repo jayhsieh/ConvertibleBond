@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LCP", "ConsoleApplication6\LCP.csproj", "{A082CA9E-41E8-49CA-A288-6B7E35A8CCCC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConvertibleBond", "ConvertibleBond\ConvertibleBond.csproj", "{F5272300-B51C-4ACF-A43D-B39476EE8EA1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +11,10 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{A082CA9E-41E8-49CA-A288-6B7E35A8CCCC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A082CA9E-41E8-49CA-A288-6B7E35A8CCCC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A082CA9E-41E8-49CA-A288-6B7E35A8CCCC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A082CA9E-41E8-49CA-A288-6B7E35A8CCCC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F5272300-B51C-4ACF-A43D-B39476EE8EA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F5272300-B51C-4ACF-A43D-B39476EE8EA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F5272300-B51C-4ACF-A43D-B39476EE8EA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F5272300-B51C-4ACF-A43D-B39476EE8EA1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

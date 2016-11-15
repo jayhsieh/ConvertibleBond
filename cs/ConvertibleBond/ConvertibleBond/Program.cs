@@ -10,6 +10,7 @@ namespace LCP
         static void Main(string[] args)
         {
             ConvertibleBondTest();
+            //AmericanPutOptionTest();
         }
 
         static public void ConvertibleBondTest()
@@ -17,7 +18,7 @@ namespace LCP
             double sigma = 0.2;
             double rc = 0.2;
             double r = 0.05;
-            double rg = 0.2;
+            double rg = 0.02;
             double[] coupon_dates = new double[10];
             linspace(coupon_dates, 0.5, 5, 10);
             double Bc_clean = 110;
@@ -34,14 +35,14 @@ namespace LCP
             double[] CB = new double[N];
             double[] COCB = new double[N];
             double[] x = new double[N];
-            linspace(x, 0, 5*F, N);
+            linspace(x, 0, 2*F, N);
 
             BlkSch[] bs = new BlkSch[2];
             //construct Black Scholes equation for CB
             BoundaryCondition[] CB_bc = new BoundaryCondition[2];
             CB_bc[0] = new BoundaryCondition(); CB_bc[1] = new BoundaryCondition();
             CB_bc[0].bc_type = BoundaryCondition.BC_Type.ZeroS;
-            CB_bc[1].bc_type = BoundaryCondition.BC_Type.Dirichlet;
+            CB_bc[1].bc_type = BoundaryCondition.BC_Type.LargeS;
             CB_bc[1].bc_values[0] = kappa * x.Last(); 
             double[] minus_rcB = new double[N];
             bs[0] = new BlkSch(CB, x, 0.5*sigma*sigma, rg, -r, minus_rcB, CB_bc);
@@ -50,7 +51,7 @@ namespace LCP
             BoundaryCondition[] COCB_bc = new BoundaryCondition[2];
             COCB_bc[0] = new BoundaryCondition(); COCB_bc[1] = new BoundaryCondition();
             COCB_bc[0].bc_type = BoundaryCondition.BC_Type.ZeroS;
-            COCB_bc[1].bc_type = BoundaryCondition.BC_Type.Dirichlet;
+            COCB_bc[1].bc_type = BoundaryCondition.BC_Type.LargeS;
             COCB_bc[1].bc_values[0] = 0;
             bs[1] = new BlkSch(COCB, x, 0.5 * sigma * sigma, rg, -(r + rc), null, COCB_bc);
 
@@ -92,9 +93,12 @@ namespace LCP
             double t = T;
             double dt = 1.0 / 365;
             int coupon_index = coupon_dates.Length - 1;
-            string output = "CBsol.txt";
-            System.IO.File.WriteAllText(output, string.Empty);
-            solver.printSolution(output);
+            string CBoutput = "CBsol.txt";
+            string COCBoutput = "COCBsol.txt";
+            System.IO.File.WriteAllText(CBoutput, string.Empty);
+            System.IO.File.WriteAllText(COCBoutput, string.Empty);
+            solver.printSolution(CBoutput, CB);
+            solver.printSolution(COCBoutput, COCB);
             Console.WriteLine("t = {0}, dt = {1}", t, dt);
             while (t > 0) {
                 if (t - dt < 0) dt = t;
@@ -131,7 +135,8 @@ namespace LCP
                 t = t - dt;
                 Console.WriteLine("t = {0}, dt = {1}", t, dt);
                 Console.WriteLine("price(100) = {0}", solver.getPrice(bs[0], 100));
-                solver.printSolution(output);
+                solver.printSolution(CBoutput, CB);
+                solver.printSolution(COCBoutput, COCB);
             }
         }
 
@@ -165,7 +170,7 @@ namespace LCP
             bc[0].bc_values[0] = Math.Max(E - x[0], 0);
 
             //bc[1].bc_type = BoundaryCondition.BC_Type.Dirichlet;
-            bc[1].bc_type = BoundaryCondition.BC_Type.Extrapolate;
+            bc[1].bc_type = BoundaryCondition.BC_Type.LargeS;
             bc[1].bc_values[0] = Math.Max(E - x.Last(), 0);
 
             for (int i = 0; i < sol.Length; ++i)
@@ -185,7 +190,7 @@ namespace LCP
                     dt = t;
                 t = t - dt;
                 bs_solver.advance(dt);
-                bs_solver.printSolution("AmPut.txt");
+                bs_solver.printSolution("AmPut.txt", sol);
                 Console.WriteLine("price(100) = {0}", bs_solver.getPrice(bs[0], 100));
             }
         }
@@ -203,7 +208,7 @@ namespace LCP
 
     class BoundaryCondition
     {
-        public enum BC_Type { ZeroS, Extrapolate, Dirichlet};
+        public enum BC_Type { ZeroS, LargeS, Dirichlet};
         public BC_Type bc_type = 0;
         public double[] bc_values = new double [4];
         public BoundaryCondition() {
@@ -315,7 +320,7 @@ namespace LCP
                        + sol[i] * (1 - (alpha + beta - c0) * (1 - theta) * dt)
                        + sol[i + 1] * beta * (1 - theta) * dt;
                 if (source != null)
-                    rhs[i] += source[i];
+                    rhs[i] += source[i] * dt;
             }
         }
 
@@ -341,22 +346,20 @@ namespace LCP
                     if (dir == DIR.UPPER)
                         throw new InvalidEnumArgumentException("Cannot use zero boundary on upper side");
                     coef[0] = 1 - bs.c0 * theta * dt;
-                    rhs[0]  = 1 + bs.c0 * (1 - theta) * dt;
+                    rhs[0]  = (1 + bs.c0 * (1 - theta) * dt) * bs.sol[0];
+                    if (bs.source != null)
+                        rhs[0] += bs.source[0] * dt;
                     break;
-                case BoundaryCondition.BC_Type.Extrapolate:
-                    rhs[0] = 0;
+                case BoundaryCondition.BC_Type.LargeS:
                     if (dir == DIR.LOWER)
                     {
-                        double p0 = 1 + 0.5 * (x[1] - x[0]) / (x[2] - x[1]);
-                        double p1 = -0.5 * (x[1] - x[0]) / (x[2] - x[1]);
-                        coef[0] = 1; coef[1] = -p0; coef[2] = -p1;
+                        throw new InvalidEnumArgumentException("Cannot use large s boundary on lower side");
                     }
                     else
                     {
                         int m = x.Length-1;
-                        double p0 = 1 + 0.5 * (x[m] - x[m - 1]) / (x[m - 1] - x[m - 2]);
-                        double p1 = -0.5 * (x[m] - x[m - 1]) / (x[m - 1] - x[m - 2]);
-                        coef[m - 2] = -p1; coef[m - 1] = -p0; coef[m] = 1; 
+                        rhs[m] = 0;
+                        coef[m - 2] = -1; coef[m - 1] = 2; coef[m] = -1; 
                     }
                     break;
                 case BoundaryCondition.BC_Type.Dirichlet:
@@ -375,10 +378,10 @@ namespace LCP
             }
         }
 
-        public void printSolution(string fname) {
+        public void printSolution(string fname, double[] sol) {
             using (var stream = new StreamWriter(fname, true))
             {
-                foreach (var item in bs[0].sol)
+                foreach (var item in sol)
                 {
                     stream.Write("{0:F3} ", item);
                 }
@@ -482,11 +485,13 @@ namespace LCP
                     if (i == 0)
                     {
                         //first row
+                        //Console.WriteLine("Before x[0] = {0}", x[0]);
                         double tmp = 0;
                         for (int j = i + 1; j < n; ++j)
                             tmp += lower_bc[j] * x[j];
                         x[i] = (1 - w) * x[i]
                              + w / lower_bc[i] * (b[i] - tmp);
+                        //Console.WriteLine("After x[0] = {0}", x[0]);
                     }
                     else if (i == n - 1)
                     {
