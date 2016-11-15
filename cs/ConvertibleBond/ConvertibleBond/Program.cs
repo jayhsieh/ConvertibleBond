@@ -16,9 +16,9 @@ namespace LCP
         static public void ConvertibleBondTest()
         {
             double sigma = 0.2;
-            double rc = 0.2;
+            double rc = 0.02;
             double r = 0.05;
-            double rg = 0.065;
+            double rg = 0.05;
             double[] coupon_dates = new double[10];
             linspace(coupon_dates, 0.5, 5, 10);
             double Bc_clean = 110;
