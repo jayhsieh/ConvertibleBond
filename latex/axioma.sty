@@ -1,0 +1,181 @@
+\RequirePackage{xcolor}
+\RequirePackage[final]{graphicx}
+\RequirePackage{fancyhdr}
+\RequirePackage{pdfpages}
+\RequirePackage{ifthen}
+\RequirePackage{draftwatermark}%
+\RequirePackage[margin=2.5cm]{geometry}
+%\RequirePackage[margin=3.5cm]{geometry}
+
+%% Initialize some variables
+\SetWatermarkLightness{1.0}
+\newboolean{AXhasdraft}
+\setboolean{AXhasdraft}{false}
+\newboolean{AXisconfidential}
+\setboolean{AXisconfidential}{false}
+
+\DeclareOption{draft}{\AtEndOfPackage{\cfoot[\textsf{CONFIDENTIAL -- DO NOT%
+REDISTRIBUTE}]{\textsf{CONFIDENTIAL -- DO NOT REDISTRIBUTE}}}%
+\SetWatermarkScale{6}%
+\SetWatermarkText{DRAFT}%
+\SetWatermarkLightness{0.8}%
+\setboolean{AXhasdraft}{true}%
+\setboolean{AXisconfidential}{true}%
+}
+\DeclareOption{release}{\AtEndOfPackage{\cfoot[]{}}}
+\DeclareOption{confidential}{\AtEndOfPackage{\cfoot[\textsf{CONFIDENTIAL -- DO NOT%
+REDISTRIBUTE}]{\textsf{CONFIDENTIAL -- DO NOT REDISTRIBUTE}}}%
+\setboolean{AXhasdraft}{true}%
+\setboolean{AXisconfidential}{true}%
+}
+
+\ProcessOptions
+
+\definecolor{AxiomaBlue}{rgb}{0,0.353,0.612}
+\definecolor{AxiomaGray}{rgb}{0.41,0.41,0.41}
+
+\ifthenelse{\boolean{AXhasdraft}}{
+}{
+\AtEndDocument{\clearpage%
+\includepdf{officeinfo.pdf}}
+}
+
+\let\LaTeXtitle\title
+\renewcommand{\title}[1]{\LaTeXtitle{\bfseries\color{AxiomaBlue}\textsf{#1}}}
+
+\let\AXmaketitle\maketitle
+\renewcommand{\maketitle}{\AXmaketitle%
+\thispagestyle{fancy}%
+}
+
+
+%Watermark options stuff (just for future reference)
+% Use the following to make modification
+%\SetWatermarkAngle{45}
+%\SetWatermarkLightness{0.8}
+%\SetWatermarkFontSize{5cm}
+%\SetWatermarkScale{6}
+%\SetWatermarkText{DRAFT}
+
+%\usepackage{sectsty}
+
+%\allsectionsfont{\sffamily \color{AxiomaBlue}}
+
+% I got this hack from
+% http://groups.google.com/group/comp.text.tex/browse_thread/thread/ca1405f996638f63/428012fc1155e9c6%23428012fc1155e9c6
+% to try and fix this problem with coloring sections at the top of the
+% page.  
+\def\@sect#1#2#3#4#5#6[#7]#8{%
+  \ifnum #2>\c@secnumdepth
+    \let\@svsec\@empty
+  \else
+    \refstepcounter{#1}%
+    \protected@edef\@svsec{\@seccntformat{#1}\relax}%
+  \fi
+  \@tempskipa #5\relax
+  \ifdim \@tempskipa>\z@
+    \begingroup
+        \@hangfrom{#6\hskip #3\relax\@svsec}%
+          \interlinepenalty \@M#6#8\@@par
+    \endgroup
+    \csname #1mark\endcsname{#7}%
+    \addcontentsline{toc}{#1}{%
+      \ifnum #2>\c@secnumdepth \else
+        \protect\numberline{\csname the#1\endcsname}%
+      \fi
+      #7}%
+  \else
+    \def\@svsechd{%
+      #6{\hskip #3\relax
+      \@svsec #8}%
+      \csname #1mark\endcsname{#7}%
+      \addcontentsline{toc}{#1}{%
+        \ifnum #2>\c@secnumdepth \else
+          \protect\numberline{\csname the#1\endcsname}%
+        \fi
+        #7}}%
+  \fi
+  \@xsect{#5}} 
+
+\let\LaTeX@startsection\@startsection 
+\renewcommand{\@startsection}[6]{\LaTeX@startsection%
+{#1}{#2}{#3}{#4}{#5}{#6\bfseries\sffamily\color{AxiomaBlue}}} 
+
+\newcommand{\TheTitle}{}
+\newcommand{\AxiomaTitle}[2][\DefaultArg]{\def\DefaultArg{#2}\title{#2}\renewcommand{\TheTitle}{#1}\newcommand{\TheFullTitle}{#2}}
+\newcommand{\AxiomaAbstract}[1]{\newcommand{\TempAbstract}{#1}}
+
+\newcommand{\makecoverpage}[2]{%
+\thispagestyle{empty}
+\newlength{\realtopmargin}
+\setlength{\realtopmargin}{\voffset}
+\addtolength{\realtopmargin}{1in}
+\addtolength{\realtopmargin}{\topskip}
+\addtolength{\realtopmargin}{\topmargin}
+\addtolength{\realtopmargin}{\headheight}
+\addtolength{\realtopmargin}{\headsep}
+\vspace*{-\realtopmargin}
+\newlength{\realleftmargin}
+\setlength{\realleftmargin}{\hoffset}
+\addtolength{\realleftmargin}{1in}
+\hspace{-\realleftmargin}\scalebox{0.3}{\includegraphics{swoosh}}
+
+\hspace{-3cm}
+\begin{tabular}{l@{\hspace{1in}}l}
+\scalebox{0.25}{\includegraphics{AxiomaLogoLargecropped}} & 
+\begin{minipage}[c]{5in}
+{\color{AxiomaBlue} \sffamily \Large
+Axioma Research Paper \\
+No. #2 \\
+
+
+{\bf \sffamily #1}
+\vspace{1cm}
+
+\hrule
+
+\vspace{1cm}
+}
+\end{minipage} \\
+& \begin{minipage}[c]{4in}
+{\begin{flushleft}\color{AxiomaBlue} \sffamily \Large
+\TheFullTitle
+\end{flushleft}
+}
+\vspace{0.75cm}
+
+{\color{AxiomaGray} \sffamily
+\TempAbstract
+}
+\end{minipage}
+\end{tabular}
+%
+\pagebreak%
+\maketitle%
+\thispagestyle{fancy}%
+}
+
+\ifthenelse{\boolean{AXisconfidential}}{
+\lhead[\textsf{\TheTitle}]{\textsf{\TheTitle\textsf{CONFIDENTIAL - DO NOT REDISTRIBUTE}}}}{
+\lhead[\textsf{\TheTitle}]{\textsf{\TheTitle}}
+}
+\chead[]{}
+\rhead[]{\begin{picture}(0,0)
+   \put(-100,0){\scalebox{0.12}{\includegraphics{AxiomaLogoLargecropped}}}
+\end{picture}}
+
+\lfoot[\textsf{Axioma}]{\textsf{Axioma}}
+\cfoot[]{}
+\rfoot[\thepage]{\thepage}
+
+\setlength{\headheight}{30pt}
+\renewcommand{\headrulewidth}{1.5pt}
+\renewcommand{\footrulewidth}{1.5pt}
+\renewcommand{\headrule}{{\color{AxiomaBlue}%
+\hrule width\headwidth height\headrulewidth \vskip-\headrulewidth}}
+
+\renewcommand{\footrule}{{\color{AxiomaBlue}%
+\vskip-\footruleskip\vskip-\footrulewidth
+\hrule width\headwidth height\footrulewidth\vskip\footruleskip}}
+
+\pagestyle{fancy}

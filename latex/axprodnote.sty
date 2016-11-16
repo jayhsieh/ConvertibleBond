@@ -1,0 +1,41 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{axprodnote}[2012/05/12 Defines Axioma product sheet style]
+
+\RequirePackageWithOptions{axioma}
+
+% disables chapter, section and subsection numbering
+\setcounter{secnumdepth}{-1}
+
+\RequirePackage{datetime}
+% Set format of dates
+\newdateformat{monthyeardate}{\monthname[\THEMONTH] \THEYEAR}
+\monthyeardate
+
+% Insert vertical rule between columns
+\setlength{\columnseprule}{0.0005mm}
+\setlength{\columnsep}{7mm}
+
+% Remove the author field and the space associated with it
+% from the definition of maketitle
+\renewcommand\@maketitle{%
+  \newpage
+  \null
+  \vskip 2em%
+  \begin{center}%
+  \let \footnote \thanks
+    {\LARGE \@title \par}%
+    \vskip 1em%
+    {\large \@date}%
+  \end{center}%
+  \par
+  \vskip 1.5em}
+
+\RequirePackage[parfill]{parskip}
+
+\RequirePackage[margin=1em,font={small,sl},labelfont=bf]{caption}
+
+% Make lists more compact
+\RequirePackage{enumitem}
+
+% Make lists more compact
+%\setitemize{noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt}
