@@ -60,8 +60,9 @@ namespace LCP
                 double[] cb = V[0];
                 double[] cocb = V[1];
                 //upside constrain due to callability
-                if (cb[i] > Math.Max(Bc, kappa * x[i])) {
-                    cb[i] = Math.Max(Bc, kappa * x[i]);
+                double tmp = Math.Max(Bc, kappa * x[i]);
+                if (cb[i] > tmp) {
+                    cb[i] = tmp;
                     cocb[i] = 0;
                 }
 
@@ -72,8 +73,9 @@ namespace LCP
                 }
 
                 //upside constrain due to conversion
-                if (cb[i] < kappa * x[i]) {
-                    cb[i] = kappa * x[i];
+                tmp = kappa * x[i];
+                if (cb[i] < tmp) {
+                    cb[i] = tmp;
                     cocb[i] = 0;
                 }
             });
@@ -84,8 +86,6 @@ namespace LCP
                 COCB[i] = (kappa * x[i] >= F + Coupon) ? 0.0 : F + Coupon;       
             }
 
-            print(CB);
-            print(x);
             //construct solver
             BS_PSOR solver = new BS_PSOR(bs, constrain);
 
@@ -135,8 +135,8 @@ namespace LCP
                 t = t - dt;
                 Console.WriteLine("t = {0}, dt = {1}", t, dt);
                 Console.WriteLine("price(100) = {0}", solver.getPrice(bs[0], 100));
-                solver.printSolution(CBoutput, CB);
-                solver.printSolution(COCBoutput, COCB);
+                //solver.printSolution(CBoutput, CB);
+                //solver.printSolution(COCBoutput, COCB);
             }
         }
 
@@ -337,7 +337,7 @@ namespace LCP
             psor_solver.tolerance = Math.Min(dt, min_dx) * 0.01;
             psor_solver.maxIter = 200;
             psor_solver.solve();
-            //Console.WriteLine("Iteration: {0}, Error Norm: {1}", psor_solver.NumIter, psor_solver.ErrorNorm);
+            Console.WriteLine("Iteration: {0}, Error Norm: {1}", psor_solver.NumIter, psor_solver.ErrorNorm);
         }
 
         void applyBoundaryCondition(BlkSch bs, BoundaryCondition bc, double[] coef, double[] rhs, double[] x, DIR dir) {
@@ -509,7 +509,7 @@ namespace LCP
                     }
                 }
                 if (applyConstrain != null)
-                    applyConstrain.Invoke(x_new, i);
+                    applyConstrain(x_new, i);
             }
             //Console.WriteLine(string.Join(",", D));
         }
@@ -539,8 +539,10 @@ namespace LCP
                 double[] x = sol_set[i];
                 double[] y = sol_set_old[i];
                 double err = 0;
+
                 for (int j = 0; j < x.Length; ++j)
                     err += (x[j] - y[j]) * (x[j] - y[j]);
+            
                 err = Math.Sqrt(err);
                 max_err = Math.Max(max_err, err);
             }

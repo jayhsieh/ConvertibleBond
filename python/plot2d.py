@@ -4,7 +4,7 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import matplotlib.pyplot as plt
 import numpy as np
 
-path = "D:/"
+path = "D:/Results/"
 #fnames = ["CBsol_zero", "CBsol_coupon", "CBsol_put", "CBsol_callput"]
 #decros = ["-", ".", ".-", "--"];
 #legends = ["Zero-coupon", "Coupon payment", "Coupon plus put", "Coupon plus put and call"];

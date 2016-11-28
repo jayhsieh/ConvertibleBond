@@ -31,7 +31,7 @@ P(t) = \Sigma c_i\delta(t-t_i)
 \end{equation}
 where $\delta(x)$ is the Dirac function, that is $\delta(x)$ equals to $1$ at $x = 0$ and equal to $0$ elsewhere.
 
-The final condition as well as the boundary constrains are defined below:
+The final condition as well as the boundary constraints are defined below:
 \begin{itemize}
 \item Final conditions at maturity:
 \begin{eqnarray}
@@ -46,13 +46,13 @@ U \ge C_r S\\
 V = 0 \text{, if } U \le C_r S
 \end{eqnarray}
 
-\item Upside constrains due to callability by the CB issuer when $t\in \Omega_{call}$:
+\item Upside constraints due to callability by the CB issuer when $t\in \Omega_{call}$:
 \begin{eqnarray}
 U \le \max(B_{call}, C_rS)\\
 V = 0 \text{, if } U \ge B_{call}
 \end{eqnarray}
 
-\item Downside constrains due to putability by the investor when $t \in \Omega_{put}$:
+\item Downside constraints due to putability by the investor when $t \in \Omega_{put}$:
 \begin{eqnarray}
 U \ge B_{put} \\
 V = B_{put} \text{, if } U \le B_{put}
@@ -123,13 +123,13 @@ where
 For the equation of CB, $c_2 = \sigma^2/2$, $c_1 = r_g$, $c_0 = -r$ and $\mathbf{f} = -r_c \mathbf{V}$, and for COCB, $c_2 = \sigma^2/2$, $c_1 = r_g$, $c_0 = -(r+r_c)$ and $\mathbf{f} = \mathbf{0}$. In consideration of efficiency, only the tridiagonal band part of the coefficient matrix is stored and send to the the PSOR solver.  
 
 \subsection{Projected Successive Over-relaxation Method}
-The PSOR iteration is used to solve the problem of $\mathbf{Ax} = \mathbf{b}$ with constrains, where $\mathbf{A} = (\mathbf{I} + \theta M)$ and $ \mathbf{b} = (\mathbf{I} - (1-\theta)\mathbf{M})\mathbf{U}^{n+1} + \mathbf{f}\Delta t$. Here we use $\mathbf{I}$ to represent identity matrix, $a_{ij}$ to represent the $i$th-row, $j$th-column element in matrix $\mathbf{A}$, and $b_i$ to represent the $i$-th element in vector $\mathbf{b}$. For each $x^k_i$ in the solution space at the $k$-th iteration, the recursion formula is:
+The PSOR iteration is used to solve the problem of $\mathbf{Ax} = \mathbf{b}$ with constraints, where $\mathbf{A} = (\mathbf{I} + \theta M)$ and $ \mathbf{b} = (\mathbf{I} - (1-\theta)\mathbf{M})\mathbf{U}^{n+1} + \mathbf{f}\Delta t$. Here we use $\mathbf{I}$ to represent identity matrix, $a_{ij}$ to represent the $i$th-row, $j$th-column element in matrix $\mathbf{A}$, and $b_i$ to represent the $i$-th element in vector $\mathbf{b}$. For each $x^k_i$ in the solution space at the $k$-th iteration, the recursion formula is:
 \begin{equation}
 x_i^{k+1} = (1-\omega)x_i^{k} + \frac{\omega}{a_{ii}}(b_i - \Sigma_{j < i} a_{ij}x_{j}^{(k+1)} - \Sigma_{j > i}a_{ij}x_j^{k})
 \end{equation}
 where $0< \omega < 2$ is the relaxation factor. The iteration terminates when the number of iterations exceeds a preset number or the $2$-norm of the difference of the solution at the $k$-th and $k+1$-th step is smaller than the preset tolerance.
 
-After each iteration step, the constrains in section \ref{sec:intro} are applied once to the solution space. In specific, the upside and downside constrains are applied as follows:
+After each iteration step, the constraints in section \ref{sec:intro} are applied once to the solution space. In specific, the upside and downside constraints are applied as follows:
 \begin{itemize}
 \item
 If $U_i > \max(B_{call}, C_rS_i)$ and $t\in \Omega_{call}$, let
@@ -153,7 +153,7 @@ The coupon payments are handled by considering the discrete time point $t_n$ bef
 where $c_n$ is the coupon payment between $t_n$ and $t_{n+1}$.
 
 \section{Implementation}
-The implementation includes building several components and is illustrated in the Diagram \ref{fig:Classes}. The \textit{ConvertibleBondPDEPricer} creates the Black-Scholes equation for Equation \ref{eq:CB} and \ref{eq:COCB} and send to the \textit{Discretizer}, which discretizes the equations and generates the corresponding \textit{SparseLinearSystem} objects according to different numerical schemes. The \textit{PSOR} solver receives the sparse linear system as well as the constrains, and then solve it using SOR iteration. The constrains are applied at each iteration step. 
+The implementation includes building several components and is illustrated in the Diagram \ref{fig:Classes}. The \textit{ConvertibleBondPDEPricer} creates the Black-Scholes equation for Equation \ref{eq:CB} and \ref{eq:COCB} and send to the \textit{Discretizer}, which discretizes the equations and generates the corresponding \textit{SparseLinearSystem} objects according to different numerical schemes. The \textit{PSOR} solver receives the sparse linear system as well as the constraints, and then solve it using SOR iteration. The constraints are applied at each iteration step. 
 \begin{figure}
 \includegraphics[width=\textwidth]{Figures/CBobjects}
 \caption{Interaction between different classes}
