@@ -16,8 +16,9 @@ t = np.loadtxt('D:/Results/time.txt')
 # meshstride = 8
 
 #parameters for COCB
-Vmin = 0; Vmax = amax(V);
+Vmin = 0; Vmax = amax(V)
 Ymin = 0; Ymax = 200
+print(amax(V))
 Smax = 500
 angle = 20
 meshstride = 20
@@ -40,7 +41,7 @@ V[X > Ymax] = NaN
 ax.set_zlim(Vmin, Vmax)
 ax.set_ylim(Ymin, Ymax)
 
-surf = ax.plot_surface(Y, X, V, cmap=cm.coolwarm, cstride=10, rstride=1, alpha=0.99,
+surf = ax.plot_surface(Y, X, V, cmap=cm.coolwarm, cstride=round(Nx/80), rstride=1, alpha=0.99,
                    linewidth=0.1, antialiased=False, vmin = Vmin, vmax = Vmax)
 #ax.plot_wireframe(Y, X, V, rstride=meshstride, cstride=meshstride)
 ax.set_xlabel("Time [years]")

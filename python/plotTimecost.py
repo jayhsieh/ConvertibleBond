@@ -9,19 +9,31 @@ ax = fig.add_subplot(111)
 
 file_path = "D:/Data/timecost_debug.txt"
 data = np.loadtxt(file_path)
-plt.plot(data[:, 0], data[:, 1], 'o-')
+plt.plot(data[:, 0], data[:, 1], 'bo-')
+
+p = np.polyfit(data[:,0], data[:,1], 2)
+print(p)
+v2 = np.multiply(data[:,0], data[:,0])
+v2 = np.multiply(v2, p[0])
+v1 = np.multiply(data[:,0], p[1])
+fit = np.add(v2, v1)
+fit = np.add(fit, p[2])
+plt.plot(data[:,0], fit, 'b--')
+
 
 file_path = "D:/Data/timecost_release.txt"
 data = np.loadtxt(file_path)
-plt.plot(data[:, 0], data[:, 1], 's-')
+plt.plot(data[:, 0], data[:, 1], 'rs-')
+p = np.polyfit(data[:,0], data[:,1], 2)
+v2 = np.multiply(data[:,0], data[:,0])
+v2 = np.multiply(v2, p[0])
+v1 = np.multiply(data[:,0], p[1])
+fit = np.add(v2, v1)
+fit = np.add(fit, p[2])
+plt.plot(data[:,0], fit, 'r--')
 
-ratio = np.divide(data[:,0], data[0,0])
-sqrratio = np.square(ratio)
-plt.plot(data[:, 0], np.multiply(data[0, 1], ratio), 'r--')
-plt.plot(data[:, 0], np.multiply(data[0, 1], sqrratio), '>-')
-plt.legend(["Time cost of debugging version", "Time cost of release version",
-            "linear time cost", "quadratic time cost"], loc = "upper left")
-#ax.set_yscale('log')
+plt.legend(["Time cost of debug version", "Fit curve for debug version",
+            "Time cost of release version", "Fit curve for release version"], loc = "upper left")
 plt.ylabel("Time cost [ms]")
 plt.xlabel("Number of grid points")
 plt.show()

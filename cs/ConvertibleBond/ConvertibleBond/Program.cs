@@ -18,7 +18,7 @@ namespace LCP
             double sigma = 0.2;
             double rc = 0.02;
             double r = 0.05;
-            double rg = 0.05;
+            double rg = 0.02;
             double[] coupon_dates = new double[10];
             linspace(coupon_dates, 0.5, 5, 10);
             double Bc_clean = 110;
@@ -31,7 +31,7 @@ namespace LCP
             double Coupon = 4;
             double kappa = 1.0;
             double T = 5;
-            int N = 201;
+            int N = 4000;
             double[] CB = new double[N];
             double[] COCB = new double[N];
             double[] x = new double[N];
@@ -521,13 +521,13 @@ namespace LCP
             while (ErrorNorm > tolerance && NumIter++ < maxIter) {
                 doOneIteration();
                 ErrorNorm = computeError(x_new, x_old);
-               // Console.WriteLine("Iteration {0}, error norm = {1}", NumIter, ErrorNorm);
+                //Console.WriteLine("Iteration {0}, error norm = {1}", NumIter, ErrorNorm);
             }
             if (ErrorNorm > tolerance)
             {
                 //safeguard
                 Console.WriteLine("Warning: iteration limit reached, error norm = {0}", ErrorNorm);
-                //throw new WarningException("iteration limit reached");
+                throw new WarningException("iteration limit reached");
             }
         }
 
