@@ -147,13 +147,17 @@ If $U_i < C_rS_i$, let
 Without loss of generality, when the CB is not puttable, we can set $B_p = 0$, and, when it is not callable, we set $B_c = \infty$. 
 
 \subsection{Coupon Payments}
-The coupon payments are handled by considering the discrete time point $t_n$ before coupon payment and $t_{n+1}$ after coupon payment. Then the discrete coupon payments are handled by setting:
-\[\mathbf{U}^n = \mathbf{U}^{n+1} + c_n\] 
-\[\mathbf{V}^n = \mathbf{V}^{n+1} + c_n\]
-where $c_n$ is the coupon payment between $t_n$ and $t_{n+1}$.
+Consider the discrete time point $t_n$ before coupon pay time $t_c$ and $t_{n+1}$ after coupon pay time $t_c$. If such a $t_c$ exists, the time stepping size $dt$ must be reduced to $t_{n+1} - t_c$. Then the discrete coupon payments are handled by adding the coupon payment to the solution:
+\[\mathbf{U}^{n+1} = \mathbf{U}^{n+1} + c_n\] 
+\[\mathbf{V}^{n+1} = \mathbf{V}^{n+1} + c_n\]
+where $c_n$ is the coupon payment at $t_c$. In order to deal with the case having many coupon payments, the coupon list is sorted in ascending order based on its pay time prior to the main loop. A decreasing index is then maintained to keep tracking the current coupon payment, and hence only the coupon at the index need to be checked at every time step. Similar techniques are applied to the call schedules and put schedules.
 
 \section{Implementation}
-The implementation includes building several components and is illustrated in the Diagram \ref{fig:Classes}. The \textit{ConvertibleBondPDEPricer} creates the Black-Scholes equation for Equation \ref{eq:CB} and \ref{eq:COCB} and send to the \textit{Discretizer}, which discretizes the equations and generates the corresponding \textit{SparseLinearSystem} objects according to different numerical schemes. The \textit{PSOR} solver receives the sparse linear system as well as the constraints, and then solve it using SOR iteration. The constraints are applied at each iteration step. 
+The implementation includes building several components and is illustrated in the Diagram \ref{fig:Classes}. The \textit{ConvertibleBondPDEPricer} creates the Black-Scholes equation for Equation \ref{eq:CB} and \ref{eq:COCB} and send to the \textit{Discretizer}, which discretizes the equations and generates the corresponding \textit{SparseLinearSystem} objects according to different numerical schemes. The \textit{SparseLinearSystem} object only stores the tridiagnoal matrix band, right-hand-side vector and boundary condition coefficients, which may exceed the diagonal band limit. The \textit{PSOR} solver receives the sparse linear system as well as the constraints, and then solve it using SOR iteration. The constraints are applied at each iteration step. Since the solution is passed by reference, the results are updated on the fly during the iteration process.
+
+The PSOR iteration is not guaranteed to converge at all time, and thus a prescribed maximum number of iteration is needed to terminate the iteration. According to our test, the solution usually needs $20$ - $50$ iterations to converge based on a prescribed tolerance. Therefore, we choose $200$ as the iteration upper bound.
+
+The time stepping size is constant but relies on the grid spacing and \textit{CFL} condition. The stability criteria for the explicit scheme is $\Delta t < \Delta x^2/(2c_2S_{max}^2)$, and for Crank-Nicolson scheme is $\Delta t < \Delta x^2/(c_2S_{max}^2)$, where $S_{max}$ is the maximum value of the underlying asset. The implicit method is unconditionally stable, so we set $\Delta t = 0.01\Delta x$.
 \begin{figure}
 \includegraphics[width=\textwidth]{Figures/CBobjects}
 \caption{Interaction between different classes}
@@ -161,7 +165,7 @@ The implementation includes building several components and is illustrated in th
 \label{fig:Classes}
 
 \section{Numerical Results}
-The algorithm is tested on the convertible bond with the parameters described in \ref{tb:params}:
+The algorithm is tested on the convertible bond with the parameters described in Table \ref{tb:params}.
 \begin{table}
 \centering
 \begin{tabular}{ll}
@@ -184,20 +188,28 @@ Coupon payments & \$4, semiannually\\
 \end{table}
 
 
-The solution for $t = 0$ with different settings are displayed in Figure \ref{fig:compare}
-\begin{figure}[h]
+The solution for $t = 0$ with different settings are displayed in Figure \ref{fig:compare}. It is obvious that the coupon payments, puttability and callability increase the bond price in different instances.
+\begin{figure}[ht]
 \centering
 \includegraphics[width=0.7\textwidth]{Figures/compare}
 \caption{Compare the solution of zero coupon, with put, with call and put}
 \label{fig:compare}
 \end{figure}
 
-The solution surface for CB and COCB are displayed in Figure \ref{fig:surf}
-\begin{figure}[h]
-\includegraphics[width=0.5\textwidth]{Figures/CBsurf.png}
-\includegraphics[width=0.5\textwidth]{Figures/COCBsurf.png}
+The 3D surface solution for CB and COCB are displayed in Figure \ref{fig:surf}. The coupon payments result in zigzag surface due to their singular formats.
+\begin{figure}[ht]
+\includegraphics[width=0.49\textwidth]{Figures/CBsurf}
+\includegraphics[width=0.49\textwidth]{Figures/COCBsurf}
 \caption{Solution surface for CB (left) and COCB (right)}
 \label{fig:surf}
+\end{figure}
+
+The time cost is almost quadratic $O(N^2)$ on grid size $N$ since increasing the grid size not only increases the computational cost at each time step, but also reduces the time step size in order to maintain a consistent accuracy in both time and space. The relationship between computational time and grid size for the test case is displayed in Figure \ref{fig:time_cost}.
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.7\textwidth]{Figures/timecost}
+\caption{Time cost on computational grid size. The test is performed on both debug version and release version.}
+\label{fig:time_cost}
 \end{figure}
 
 \end{document}

@@ -46,7 +46,7 @@ surf = ax.plot_surface(Y, X, V, cmap=cm.coolwarm, cstride=round(Nx/80), rstride=
 #ax.plot_wireframe(Y, X, V, rstride=meshstride, cstride=meshstride)
 ax.set_xlabel("Time [years]")
 ax.set_ylabel("Stock price [$]")
-ax.set_zlabel("CB [$]")
+ax.set_zlabel("COCB [$]")
 fig.colorbar(surf, shrink=0.5, aspect=5)
 ax.view_init(30, angle)
 plt.show()

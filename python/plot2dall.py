@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 path = "D:/Results/"
-fnames = "COCBsol"
+fnames = "CBsol"
 legends = [fnames]
 fig = plt.figure()
 
@@ -19,13 +19,16 @@ S = np.linspace(0, Smax, Nx)
 
 print(msize, Nx, Nt)
 
-for i in range(0, Nt, 5):
+for i in range(0, Nt, 2):
     plt.plot(S, V[i, :])
 
-plt.legend(legends, loc = "upper right")
+plt.legend(legends, loc = "upper left")
 plt.xlabel("Stock Price")
 plt.ylabel("Convertible Bond Value")
-#axes = plt.gca()
-#axes.set_xlim([20, 160])
-#axes.set_ylim([50, 160])
+plt.set_cmap('hot')
+plt.plot(S, S, 'r--')
+
+axes = plt.gca()
+axes.set_xlim([20, 180])
+axes.set_ylim([90, 180])
 plt.show()
