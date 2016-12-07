@@ -60,8 +60,13 @@ Valuing Convertible Bond with Credit Risk Using PDE Model}
 		\item Hybrid security: a straight bond and a call on the underlying equity
 		\item Early conversion, 
 			  callability by the issuer, putability by the holder
-		\item Credit risk from coupon, principal payments, put provisions; risk free for conversion since the issuer can always deliver its own stock
+		\item Components of different risks:
+			\begin{itemize}
+				\item risk from coupon, principal payments, put provisions
+				\item risk free for conversion since the issuer can always deliver its own stock
+			\end{itemize}  
 		\item Simply using credit spread is not valid: only a part of the Convertible Bond (CB)'s value is exposed to default risk.
+		\item Binomial tree method: advantages and disadvantages
 	\end{itemize}
 \end{frame}
 
@@ -177,6 +182,41 @@ Valuing Convertible Bond with Credit Risk Using PDE Model}
 	\item Built convertible bond pricer with credit risk using PDE model
 	\item Consider conversion, callability, putability and coupon payments
 	\item Stable for large time step size, second order in time and space
+	\item Future work: Soft call, Foreign exchange volatility(FX)
 \end{itemize}
+\end{frame}
+
+\begin{frame}{Summary}
+	\begin{itemize}
+		\item Future work
+	\end{itemize}
+	\begin{table}
+		\centering
+		\begin{tabular}{lll}
+		\hline\hline\\
+		Future/Approach  & Binomial Tree & TF\\
+		\hline\\
+		Callable		 & \textcolor{blue}{Y} & \textcolor{blue}{Y}\\
+		Puttable		 & \textcolor{blue}{Y} & \textcolor{blue}{Y}\\
+		Coupon Payments  & \textcolor{blue}{Y} & \textcolor{blue}{Y}\\
+		Soft provision   & \textcolor{blue}{Y} & \textcolor{red}{N}\\
+		Foreign Exchange & \textcolor{blue}{Y} & \textcolor{red}{N}\\
+		Mandatory		 & \textcolor{red}{N} & \textcolor{red}{N}\\
+		\hline
+		\end{tabular}
+		\caption{Comparison between binomial tree and TF model}
+		\label{tb:future_work}
+	\end{table}
+\end{frame}
+
+\section{Appendix}
+\begin{frame}{Appendix}{ExcelDNA}
+\begin{figure}
+\includegraphics[width=\textwidth]{Figures/excel1.png}\\
+\includegraphics[width=0.25\textwidth]{Figures/excel2.png}
+\includegraphics[width=0.25\textwidth]{Figures/excel3.png}
+\includegraphics[width=0.25\textwidth]{Figures/excel4.png}
+\includegraphics[width=0.25\textwidth]{Figures/excel5.png}
+\end{figure}
 \end{frame}
 \end{document}
