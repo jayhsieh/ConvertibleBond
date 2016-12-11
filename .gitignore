@@ -240,3 +240,16 @@ ModelManifest.xml
 
 # FAKE - F# Make
 .fake/
+<<<<<<< HEAD
+=======
+
+# Latex files
+*.pdf
+*.toc
+*.gz
+*.out
+*.nav
+.idea
+*.snm
+*.aux
+>>>>>>> 07bfee626423b14bda60a84a9a9b48bb2a26f4b3

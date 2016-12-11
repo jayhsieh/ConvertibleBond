@@ -7,7 +7,7 @@ from pylab import *
 fig = plt.figure()
 ax = fig.add_subplot(111)
 
-file_path = "D:/Data/timecost_debug.txt"
+file_path = "D:/timecost.txt"
 data = np.loadtxt(file_path)
 plt.plot(data[:, 0], data[:, 1], 'bo-')
 
