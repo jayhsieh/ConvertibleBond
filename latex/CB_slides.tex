@@ -95,10 +95,16 @@ Valuing Convertible Bond with Credit Risk Using PDE Model}
 		\item Coupled equations: should be solved simultaneously
 		\item Early call, put, and conversion: American-style derivative
 		\item Free boundary problem: equations are not valid beyond boundaries
-		\begin{figure}
-		\centering
-		\includegraphics[width=0.8\textwidth]{Figures/obstacle.png}
-		\end{figure}
+		\item Boundary conditions: when $S = 0$, we assume
+		\begin{equation*}
+		\frac{\partial U}{\partial t} = rU + f
+		\end{equation*}
+		and for large $S$, we assume
+		\begin{equation*}
+		\frac{\partial^2 U}{\partial^2 S} = 0
+		\end{equation*}
+		\item A better way to define the boundary: convert the domain to $[0, 1]$ interval using function 
+		$x = \frac{1}{1+\alpha S}$
 	\end{itemize}
 \end{frame}
 \section{Numerical Method}
