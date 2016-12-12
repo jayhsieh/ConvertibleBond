@@ -35,8 +35,9 @@
 \title[CB pricing \hspace{0.5cm}\insertframenumber/\inserttotalframenumber]{
 Valuing Convertible Bond with Credit Risk Using PDE Model}
 \author{Zheng Gao}
-\institute{}
-\date{}
+\institute{Quantitative Pricing and Risk Analytics\\
+QPRA}
+\date{14-Dec-2016}
 
 
 \newcommand\dcdt[2]{\frac{\partial #1}{\partial #2}}
@@ -86,7 +87,7 @@ Valuing Convertible Bond with Credit Risk Using PDE Model}
 \label{eq:COCB}
 \end{equation*}
 	\item Advantage: only needs the \textcolor{red}{market-observed} credit spreads $r_c$ for straight bond of the same issuer.
-	\item Other parameters: volatility $\sigma$, risk-free rate $r$, growth rate of the stock $r_g$ and Coupon payments $P(t)$  
+	\item Other parameters: volatility $\sigma$, risk-free rate $r$, growth rate of the stock $r_g = r - q$, dividend yield $q$ and Coupon payments $P(t)$  
 	\end{itemize}
 \end{frame}
 
@@ -95,16 +96,15 @@ Valuing Convertible Bond with Credit Risk Using PDE Model}
 		\item Coupled equations: should be solved simultaneously
 		\item Early call, put, and conversion: American-style derivative
 		\item Free boundary problem: equations are not valid beyond boundaries
-		\item Boundary conditions: when $S = 0$, we assume
+		\item Boundary conditions:
 		\begin{equation*}
-		\frac{\partial U}{\partial t} = rU + f
+		\frac{\partial U}{\partial t} = rU + f, \quad S = 0
 		\end{equation*}
-		and for large $S$, we assume
 		\begin{equation*}
-		\frac{\partial^2 U}{\partial^2 S} = 0
+		\frac{\partial^2 U}{\partial^2 S} = 0, \quad \textit{large } S
 		\end{equation*}
 		\item A better way to define the boundary: convert the domain to $[0, 1]$ interval using function 
-		$x = \frac{1}{1+\alpha S}$
+		$x = \frac{S}{S+\alpha}$, and apply appropriate boundary conditions (Fichera theory).
 	\end{itemize}
 \end{frame}
 \section{Numerical Method}
