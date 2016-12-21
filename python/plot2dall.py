@@ -29,6 +29,6 @@ plt.set_cmap('hot')
 plt.plot(S, S, 'r--')
 
 axes = plt.gca()
-axes.set_xlim([20, 180])
-axes.set_ylim([90, 180])
+#axes.set_xlim([20, 180])
+#axes.set_ylim([90, 180])
 plt.show()

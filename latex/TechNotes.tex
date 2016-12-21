@@ -8,7 +8,7 @@
 \maketitle
 
 \section{Introduction\label{sec:intro}}
-Convertible bonds ($CB$) have been around for more than a century. It is a security in which the investor can convert the instrument into a predefined number of shared of the company that issued the bond. The conversion is not mandatory and is an option for the investor. At maturity, the holder has the right to swap the face value $F$ of the bond for $C_r$ shared with price $S$, where $C_r$ is the conversion ratio. Most convertibles are American-style in their conversion possibilities: converting the bond into shares is not limited to the maturity date only, but may happen during a predefined conversion period. In addition to conversion feature, there is also a possibility for the bond to be called by the issuer in time interval $\Omega_{call}$ and to be put by the investor in time interval $\Omega_{put}$. The moment the bond gets called, the investor can sill convert into shares even not in the conversion interval. 
+Convertible bonds ($CB$) have been around for more than a century. It is a security in which the investor can convert the instrument into a predefined number of shared of the company that issued the bond. The conversion is not mandatory and is an option for the investor. At maturity, the holder has the right to swap the face value $F$ of the bond for $C_r$ shared with price $S$, where $C_r$ is the conversion ratio. Most convertibles are American-style in their conversion possibilities: converting the bond into shares is not limited to the maturity date only, but may happen during a predefined conversion period. In addition to conversion feature, there is also a possibility for the bond to be called by the issuer in time interval $\Omega_{call}$ and to be put by the investor in time interval $\Omega_{put}$. The moment the bond gets called, the investor can still convert into shares even not in the conversion interval. 
 
 The difficulty for solving the Black-Scholes equation for $CB$ is that one can hardly assign a predetermined value to the credit spread $r_c$. If the easily observable credit spread implied by a similar non-convertible bond of the same issuer were used for $r_c$, one would unnecessarily penalize the risk-free equity upside of the CB.
 
@@ -125,7 +125,7 @@ For the equation of CB, $c_2 = \sigma^2/2$, $c_1 = r_g$, $c_0 = -r$ and $\mathbf
 \subsection{Projected Successive Over-relaxation Method}
 The PSOR iteration is used to solve the problem of $\mathbf{Ax} = \mathbf{b}$ with constraints, where $\mathbf{A} = (\mathbf{I} + \theta M)$ and $ \mathbf{b} = (\mathbf{I} - (1-\theta)\mathbf{M})\mathbf{U}^{n+1} + \mathbf{f}\Delta t$. Here we use $\mathbf{I}$ to represent identity matrix, $a_{ij}$ to represent the $i$th-row, $j$th-column element in matrix $\mathbf{A}$, and $b_i$ to represent the $i$-th element in vector $\mathbf{b}$. For each $x^k_i$ in the solution space at the $k$-th iteration, the recursion formula is:
 \begin{equation}
-x_i^{k+1} = (1-\omega)x_i^{k} + \frac{\omega}{a_{ii}}(b_i - \Sigma_{j < i} a_{ij}x_{j}^{(k+1)} - \Sigma_{j > i}a_{ij}x_j^{k})
+x_i^{k+1} = (1-\omega)x_i^{k} + \frac{\omega}{a_{ii}}(b_i - \Sigma_{j < i} a_{ij}x_{j}^{k+1} - \Sigma_{j > i}a_{ij}x_j^{k})
 \end{equation}
 where $0< \omega < 2$ is the relaxation factor. The iteration terminates when the number of iterations exceeds a preset number or the $2$-norm of the difference of the solution at the $k$-th and $k+1$-th step is smaller than the preset tolerance.
 
@@ -207,9 +207,45 @@ The 3D surface solution for CB and COCB are displayed in Figure \ref{fig:surf}. 
 The time cost is almost quadratic $O(N^2)$ on grid size $N$ since increasing the grid size not only increases the computational cost at each time step, but also reduces the time step size in order to maintain a consistent accuracy in both time and space. The relationship between computational time and grid size for the test case is displayed in Figure \ref{fig:time_cost}.
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.7\textwidth]{Figures/timecost}
-\caption{Time cost on computational grid size. The test is performed on both debug version and release version.}
+\includegraphics[width=0.45\textwidth]{Figures/timecost}
+\includegraphics[width=0.45\textwidth]{Figures/converge}
+\caption{Time cost on computational grid size (left) and convergence of bond price (right). The test is performed on both debug version and release version.}
 \label{fig:time_cost}
 \end{figure}
 
+\section{Appendix}
+\subsection{Domain Transformation}
+The original equations are defined in a semi-infinite domain, but in practice the domain has to be truncated to a finite domain. This will waste a lot of grids to compute the values in the large side. Instead of solving the original equation, one can transform the original domain to a finite domain $[0, 1]$ using function $y = S/(S+\alpha)$. Through simple calculus, we have:
+\begin{equation}
+S = \frac{\alpha y}{1 - y}
+\end{equation}
+\begin{equation}
+\frac{\partial y}{\partial S} = \frac{(1-y)^2}{\alpha}
+\end{equation}
+\begin{equation}
+\frac{\partial U}{\partial S} = \frac{\partial U}{\partial y}\frac{(1-y)^2}{\alpha}
+\end{equation}
+\begin{equation}
+\frac{\partial^2U}{\partial^2 S} = \frac{(1-y)^3}{\alpha^2}[\frac{\partial^2U}{\partial^2y}(1-y) - 2\frac{\partial U}{\partial y}]
+\end{equation}
+
+Consider a general form of Black-Scholes equation:
+\begin{equation}
+L(U) = \frac{\partial U}{\partial t} + c_2S^{b_2}\frac{\partial^2U}{\partial^2S} + c_1S^{b_1}\frac{\partial U}{\partial S} + c_0S^{b_0}U + f(U,t) = 0
+\end{equation}
+After substituting the derivatives, we have:
+\begin{eqnarray}
+L(U) &= &\frac{\partial U}{\partial t} + c_2\alpha^{b_2-2}y^{b_2}(1-y)^{4-b_2}\frac{\partial^2 U}{\partial^2 y} \\
+&+& [c_1\alpha^{b_1-1}y^{b_1}(1-y)^{2-b_1} - 2c_2\alpha^{b_2-2}y^{b_2}(1-y)^{3-b_2}]\frac{\partial U}{\partial y} \\
+&+& c_0\frac{\alpha^{b_0}y^{b_0}}{(1-y)^{b_0}}U + f(U,t) = 0
+\end{eqnarray}
+If $b_0 = 0$, $b_1 = 1$ and $b_2 = 2$, the above equation can be simplified to:
+\begin{equation}
+L(U) = \frac{\partial U}{\partial t} + c_2y^2(1-y)^2\frac{\partial^2U}{\partial^2y} + [c_1y(1-y) - 2c_2y^2(1-y)]\frac{\partial U}{\partial y} + c_0U + f(U, t)
+\end{equation}
+For boundary condition at $y = 0$ or $y = 1$, the PDE degenerates to an ordinary differential equation:
+\begin{equation}
+\frac{\partial U}{\partial t} + c_0U + f(U, t) = 0
+\end{equation}
+which can be solved numerically. In consequence, this provides a Dirichlet boundary condition to the PDE.
 \end{document}
