@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 path = "D:/Results/"
-fnames = "CBsol"
+fnames = "sol-0"
 legends = [fnames]
 fig = plt.figure()
 

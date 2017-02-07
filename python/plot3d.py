@@ -5,23 +5,23 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pylab import *
 
-V = np.loadtxt('D:/Results/COCBsol.txt')
+V = np.loadtxt('D:/Results/sol-0.txt')
 t = np.loadtxt('D:/Results/time.txt')
 
 #parameters for CB
-# Vmin = 95; Vmax = 165
-# Ymin = 20; Ymax = 160
-# Smax = V[0,-1]
-# angle = -30
-# meshstride = 8
+Vmin = 80; Vmax = 140
+Ymin = 1; Ymax = 140
+Smax = V[0,-1]
+angle = -30
+meshstride = 8
 
 #parameters for COCB
-Vmin = 0; Vmax = amax(V)
-Ymin = 0; Ymax = 200
-print(amax(V))
-Smax = 500
-angle = 20
-meshstride = 20
+# Vmin = 0; Vmax = amax(V)
+# Ymin = 0; Ymax = 200
+# print(amax(V))
+# Smax = 500
+# angle = 20
+# meshstride = 20
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
@@ -43,10 +43,11 @@ ax.set_ylim(Ymin, Ymax)
 
 surf = ax.plot_surface(Y, X, V, cmap=cm.coolwarm, cstride=round(Nx/80), rstride=1, alpha=0.99,
                    linewidth=0.1, antialiased=False, vmin = Vmin, vmax = Vmax)
+
 #ax.plot_wireframe(Y, X, V, rstride=meshstride, cstride=meshstride)
 ax.set_xlabel("Time [years]")
 ax.set_ylabel("Stock price [$]")
-ax.set_zlabel("COCB [$]")
+ax.set_zlabel("CB price [$]")
 fig.colorbar(surf, shrink=0.5, aspect=5)
 ax.view_init(30, angle)
 plt.show()
