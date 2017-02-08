@@ -202,7 +202,7 @@ namespace ExcelDNA
         {
             Func<double, double> r = (t) => risk_free;       // risk-free interest rate
             Func<double, double> rg = (t) => stock_growth;      // growth rate of stock
-            double rc = credit_spread;      // credit spread
+            Func<double, double> rc = (t) => credit_spread;      // credit spread
 
             //call schedule
             if (callInfoMatrix.GetLength(1) != 3)
@@ -233,7 +233,7 @@ namespace ExcelDNA
             cparams.PutSchedule = PutSchedule;
             cparams.Coupons = Coupons;
 
-            CBSolver = new ConvertibleBondPDEPricer(cparams, kappa, sigma, rc, r, rg);
+            CBSolver = new TFPricer(cparams, kappa, sigma, rc, r, rg);
             CBSolver.print_time_interval = 0.25;
             CBSolver.OutDir = "D:";
             CBSolver.GridSize = 300;

@@ -7,36 +7,89 @@ using System.IO;
 using System.ComponentModel;
 using CenterSpace.NMath.Matrix;
 using CenterSpace.NMath.Core;
-using CenterSpace.NMath.Analysis;
 
 namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
 {
 
     /// <summary>
-    /// Solve convertible bond pricing using the TF model, proposed in 
-    /// "KosTas Tsiveriotis And Chris Fernandes, Valuing Convertible Bonds with credit risk, 
-    /// The Journal of Fixed Income, 1998, 95--102."
+    /// Abstract class for convertible bond pricing
     /// </summary>
-    public class ConvertibleBondPDEPricer {
-        private double sigma;
-        private double kappa;
-        private double creditSpread;
-        private List<double[]> solution = new List<double[]>();
-        private List<double[]> solution_aux = new List<double[]>();
-        private List<double> time = new List<double>();
-        private double[] space;
-        private double[] CB;
-        private double[] COCB;
-        private double min_dx = double.MaxValue;
+    public abstract class ConvertibleBondPDEPricer {
 
-        Func<double, double> riskFree;
-        Func<double, double> growthRate;
+        #region public_members
+        /// <summary>
+        /// user is able to set the time interval for saving results to disk
+        /// </summary>
+        public double print_time_interval = double.MaxValue;
+        /// <summary>
+        /// user is able to set the output directory
+        /// default is the current directory
+        /// rerun the simulation will overwrite the old results
+        /// </summary>
+        public string OutDir = ".";
+        /// <summary>
+        /// user can change the grid size of space, default is 200
+        /// </summary>
+        public int GridSize = 200;
+        #endregion
+
+        #region protected_members
+        /// <summary>
+        /// 
+        /// </summary>
+        protected double Bc = double.MaxValue, Bp = 0, call_barr = 0;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        protected BlkSch[] BlkScholes;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        protected double[] space;
+
+        /// <summary>
+        /// time control variables
+        /// </summary>
+        protected double t, dt, T;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        protected double[][] solution;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        protected double sigma, kappa, F;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        protected Func<double, double> riskFree, creditSpread, growthRate;
+        #endregion
+
+        #region private_members
+        private List<double[]> solution_set = new List<double[]>();
+        private List<double> time = new List<double>();
+        private double min_dx = double.MaxValue;
         ConvertibleBondParameters convertibleBondParams;
+
+        //for dirty price
+        bool is_dirty_price = false;
+        double? dirty_price;
+        double? clean_price;
+
+        //for all schedules
+        List<CouponParameters> coupon = null;
+        OptionalityPeriodParameters[] callSch = null;
+        OptionalityPeriodParameters[] putSch = null;
+        BarrierParameters[] callBarrSch = null;
 
         //time control variables
         bool is_print_time = false;
         int print_time_count = 0;
-        double T = 0;
         int coupon_index = -1;
         int put_index = -1;
         int call_index = -1;
@@ -44,39 +97,41 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
 
         // solver for helping computing Vega
         ConvertibleBondPDEPricer solver2;
+        #endregion
+
+        #region pure virtual function
+        /// <summary>
+        /// allocate memory for domain vectors
+        /// grids and solution
+        /// </summary>
+        protected abstract void setDomain();
 
         /// <summary>
-        /// customer is able to set the time interval for saving results to disk
+        /// create PDE and associated I.C. and B.C.
         /// </summary>
-        public double print_time_interval = double.MaxValue;
-        /// <summary>
-        /// customer is able to set the output directory
-        /// default is the current directory
-        /// rerun the simulation will overwrite the old results
-        /// </summary>
-        public string OutDir = ".";
-        /// <summary>
-        /// customer can change the grid size of space, default is 200
-        /// </summary>
-        public int GridSize = 200;
+        protected abstract void createPDE();
 
         /// <summary>
-        /// Set volatility
+        /// set initial condition for PDE;
         /// </summary>
-        public double Volatility
-        {
-            get { return sigma; }
-            set { sigma = value;  }
-        }
+        protected abstract void setInitialCondition();
 
         /// <summary>
-        /// CreditSpread
+        /// constraints for the solution of PDE
         /// </summary>
-        public double CreditSpread
-        {
-            get { return creditSpread; }
-            set { creditSpread = value; }
-        }
+        protected abstract void constraints(double[][] sol, int index);
+
+        /// <summary>
+        /// virtual constructor
+        /// </summary>
+        /// <returns> a cloned object</returns>
+        protected abstract ConvertibleBondPDEPricer clone();
+        /// <summary>
+        /// compute source term for PDE
+        /// </summary>
+        protected abstract void computeSource();
+        #endregion
+
         /// <summary>
         /// Constructor for convertible bond pricer using pde model
         /// </summary>
@@ -86,36 +141,23 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
         /// <param name="riskFree"></param>
         /// <param name="growthRate"></param>
         /// <param name="creditSpread"></param>
+        /// <param name="isDirtyPrice"></param>
         public ConvertibleBondPDEPricer(ConvertibleBondParameters convertibleBondParams,
                                             double conversionRatio,
                                             double volatility,
-                                            double creditSpread,
                                             Func<double, double> riskFree,
-                                            Func<double, double> growthRate)
-        {
+                                            Func<double, double> growthRate,
+                                            Func<double, double> creditSpread,
+                                            bool isDirtyPrice = false) {
 
             this.convertibleBondParams = convertibleBondParams;
-            //sort call schedule
-            if (convertibleBondParams.CallSchedule != null)
-                convertibleBondParams.CallSchedule = convertibleBondParams.CallSchedule.OrderBy(a => a.Start).ToArray();
-            //sort put schedule
-            if (convertibleBondParams.PutSchedule != null)
-                convertibleBondParams.PutSchedule = convertibleBondParams.PutSchedule.OrderBy(a => a.Start).ToArray();
-            //sort coupon schedule
-            if (convertibleBondParams.Coupons != null)
-                convertibleBondParams.Coupons = convertibleBondParams.Coupons.OrderBy(a => a.PaymentTime).ToList();
-            //sort callbarrier
-            if (convertibleBondParams.CallBarrierSchedule != null)
-                convertibleBondParams.CallBarrierSchedule = convertibleBondParams.CallBarrierSchedule.OrderBy(a => a.End).ToArray();
+            extractParameters(convertibleBondParams);
             this.sigma = volatility;
             this.kappa = conversionRatio;
             this.riskFree = riskFree;
             this.creditSpread = creditSpread;
             this.growthRate = growthRate;
-            T = convertibleBondParams.Maturity;
-            CB = new double[GridSize];
-            COCB = new double[GridSize];
-            space = new double[GridSize];
+            is_dirty_price = isDirtyPrice;
         }
 
         /// <summary>
@@ -125,17 +167,35 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
         public ConvertibleBondPDEPricer(ConvertibleBondPDEPricer solver)
         {
             convertibleBondParams = solver.convertibleBondParams;
-                            sigma = solver.sigma;
-                            kappa = solver.kappa;
-                         riskFree = solver.riskFree;
-                     creditSpread = solver.creditSpread;
-                       growthRate = solver.growthRate;
-                                T = solver.T;
-                         GridSize = solver.GridSize;
-                               CB = new double[GridSize];
-                             COCB = new double[GridSize];
-                            space = new double[GridSize];
-              print_time_interval = solver.print_time_interval;
+            extractParameters(convertibleBondParams);
+            sigma = solver.sigma;
+            kappa = solver.kappa;
+            riskFree = solver.riskFree;
+            creditSpread = solver.creditSpread;
+            growthRate = solver.growthRate;
+            GridSize = solver.GridSize;
+            print_time_interval = solver.print_time_interval;
+            is_dirty_price = solver.is_dirty_price;
+        }
+
+        private void extractParameters(ConvertibleBondParameters CBparams)
+        {
+            //sort call schedule
+            if (CBparams.CallBarrierSchedule != null)
+                callSch = CBparams.CallSchedule.OrderBy(a => a.Start).ToArray();
+            //sort put schedule
+            if (CBparams.PutSchedule != null)
+                putSch = CBparams.PutSchedule.OrderBy(a => a.Start).ToArray();
+            //sort coupon schedule
+            if (CBparams.Coupons != null)
+                coupon = CBparams.Coupons.OrderBy(a => a.PaymentTime).ToList();
+            //sort callbarrier
+            if (CBparams.CallBarrierSchedule != null)
+                callBarrSch = CBparams.CallBarrierSchedule.OrderBy(a => a.End).ToArray();
+
+            T = CBparams.Maturity;
+
+            F = CBparams.FaceValue;
         }
 
         /// <summary>
@@ -143,95 +203,19 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
         /// </summary>
         public void CreateAndSolvePDE()
         {
-            #region extract parameters
-            if (GridSize != CB.Length) {
-                CB = new double[GridSize];
-                COCB = new double[GridSize];
-                space = new double[GridSize];
-            }
-            double F = convertibleBondParams.FaceValue;
-            List<CouponParameters> coupon = convertibleBondParams.Coupons;
-            OptionalityPeriodParameters[] callSch = null;
-            OptionalityPeriodParameters[] putSch = null;
-            BarrierParameters[] callBarrSch = null;
+            setDomain();
 
-            if (convertibleBondParams.CallSchedule != null)
-                callSch = convertibleBondParams.CallSchedule.ToArray();
+            createPDE();
 
-            if (convertibleBondParams.PutSchedule != null)
-                putSch = convertibleBondParams.PutSchedule.ToArray();
+            setInitialCondition();
 
-            if (convertibleBondParams.CallBarrierSchedule != null)
-                callBarrSch = convertibleBondParams.CallBarrierSchedule.ToArray();
+            advancePDE();
+        }
 
-            T = convertibleBondParams.Maturity;
-            double Bc = double.MaxValue; //call price
-            double Bp = 0.0; //put price
-            double call_barr = 0; //call barrier
-            double r = riskFree(T);
-            double rc = creditSpread;
-            double rg = growthRate(T);
-            #endregion
+        private void advancePDE()
+        {
+            min_dx = computeMinDx(space);
 
-            #region setup grids and boundary condition
-            //setup space grid
-            int N = space.Length;
-            double[] x = space;
-            linspace(x, 0, 5 * F, N);
-            min_dx = computeMinDx(x);
-
-            BlkSch[] bs = new BlkSch[2];
-            //construct Black Scholes equation for CB
-            BoundaryCondition[] CB_bc = new BoundaryCondition[2];
-            CB_bc[0] = new BoundaryCondition(); CB_bc[1] = new BoundaryCondition();
-            CB_bc[0].bc_type = BoundaryCondition.BC_Type.ZeroS;
-            CB_bc[1].bc_type = BoundaryCondition.BC_Type.LargeS;
-            CB_bc[1].bc_values[0] = kappa * x.Last();
-            double[] minus_rcB = new double[N];
-            bs[0] = new BlkSch(CB, x, 0.5 * sigma * sigma, rg, -r, minus_rcB, CB_bc);
-
-            //construct Black Scholes equation for COCB
-            BoundaryCondition[] COCB_bc = new BoundaryCondition[2];
-            COCB_bc[0] = new BoundaryCondition(); COCB_bc[1] = new BoundaryCondition();
-            COCB_bc[0].bc_type = BoundaryCondition.BC_Type.ZeroS;
-            COCB_bc[1].bc_type = BoundaryCondition.BC_Type.LargeS;
-            COCB_bc[1].bc_values[0] = 0;
-            bs[1] = new BlkSch(COCB, x, 0.5 * sigma * sigma, rg, -(r + rc), null, COCB_bc);
-            #endregion
-
-            #region setup constraints
-            Action<double[][], int> constraint = new Action<double[][], int>((V, i) => {
-                double[] cb = V[0];
-                double[] cocb = V[1];
-                //upside constrain due to callability
-                if (space[i] < call_barr) //no call if equity price is below the call barrier
-                    Bc = double.MaxValue;
-                if (cb[i] > Math.Max(Bc, kappa * x[i]))
-                {
-                    cb[i] = Math.Max(Bc, kappa * x[i]);
-                    cocb[i] = 0;
-                }
-
-                //downside constrain due to putability  
-                if (cb[i] < Bp)
-                {
-                    cb[i] = Bp;
-                    cocb[i] = Bp;
-                }
-
-                //upside constrain due to conversion
-                if (cb[i] < kappa * x[i])
-                {
-                    cb[i] = kappa * x[i];
-                    cocb[i] = 0;
-                }
-
-                //keep positivity
-                cb[i] = Math.Max(cb[i], 0.0);
-                cocb[i] = Math.Max(cocb[i], 0.0);
-            });
-
-            #endregion
             //set up list index for call, put, coupon
             if (putSch != null)
                 put_index = putSch.Length - 1;
@@ -242,18 +226,11 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
             if (callBarrSch != null)
                 call_barr_index = callBarrSch.Length - 1;
 
-            //setup initial condition
-            for (int i = 0; i < N; ++i)
-            {
-                CB[i] = (kappa * x[i] >= F) ? kappa * x[i] : F;
-                COCB[i] = (kappa * x[i] >= F) ? 0.0 : F;
-            }
-
             //construct solver
-            BS_PSOR solver = new BS_PSOR(bs, constraint, BS_PSOR.Scheme.CrankNicolson);
+            BS_PSOR solver = new BS_PSOR(BlkScholes, constraints, BS_PSOR.Scheme.Implicit);
 
-            double t = T;
-            double dt = min_dx * 0.01;
+            t = T;
+            dt = min_dx * 1.0e-2;
 
             string MyDir = this.OutDir + "/Results";
             cleanDirectory(MyDir);
@@ -262,21 +239,11 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
             while (t > 0)
             {
                 //setup dt
-                dt = min_dx * 0.01;
+                dt = min_dx * 1e-2;
                 timeControlFilter(t, ref dt); //update dt for next step
                 t = t - dt;
 
-                //update coefficients
-                r = riskFree(t);
-                rg = growthRate(t);
-                rc = creditSpread;
-                solver.bs[0].c1 = solver.bs[1].c1 = rg;
-                solver.bs[0].c0 = -r;
-                solver.bs[1].c0 = -(r + rc);
-
-                //update source term
-                for (int i = 0; i < N; ++i)
-                    minus_rcB[i] = -rc * COCB[i];
+                computeSource();
 
                 //update put price
                 //for discrete put schedule where put Start == End, 
@@ -285,7 +252,7 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
                     put_index--;
                 if (put_index >= 0 && t <= putSch[put_index].End)
                 {
-                    Bp = putSch[put_index].Strike + AccI(t, coupon);
+                    Bp = putSch[put_index].Strike * F + AccI(t, coupon);
                 }
                 else
                     Bp = 0;
@@ -295,7 +262,7 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
                     call_index--;
                 if (call_index >= 0 && t <= callSch[call_index].End)
                 {
-                    Bc = callSch[call_index].Strike + AccI(t, coupon);
+                    Bc = callSch[call_index].Strike * F + AccI(t, coupon);
                 }
                 else
                     Bc = double.MaxValue;
@@ -305,27 +272,17 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
                     call_barr_index--;
                 if (call_barr_index >= 0 && t < callBarrSch[call_barr_index].End)
                 {
-                    call_barr = callBarrSch[call_barr_index].Strike;
+                    call_barr = callBarrSch[call_barr_index].Strike * F;
                 }
                 else
                     call_barr = 0;
 
                 //advance solution
-                solver.advance(dt);
+                solver.advance(t, dt);
 
-                //compute Coupon between [t-dt, t], t-dt will be exactly at coupon paytime;
-                //notice that t has already been updated by t-dt
-                while (coupon_index >= 0 && Math.Abs(coupon[coupon_index].PaymentTime - (t)) < 1e-10) {
-                    System.Diagnostics.Debug.WriteLine("{0} Coupon payments at {1}, t = {2}, dt = {3}", 
-                        coupon_index, coupon[coupon_index].PaymentTime, t, dt);
-                    for (int i = 0; i < CB.Length; ++i) {
-                        CB[i] += coupon[coupon_index].PaymentAmount;
-                        COCB[i] += coupon[coupon_index].PaymentAmount;
-                    }
-                    coupon_index--;
-                }
-                
-                saveSolution(t);
+                updateSolution();
+
+                saveSolution();
 
                 if (is_print_time)
                 {
@@ -334,6 +291,66 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
                     printResults(MyDir, t);
                 }
             }
+        }
+
+        /// <summary>
+        /// update solution: add coupon payments to the solution, 
+        /// this function can be overrided
+        /// </summary>
+        protected virtual void updateSolution()
+        {
+            //compute Coupon between [t-dt, t], t-dt will be exactly at coupon paytime;
+            //notice that t has already been updated by t-dt
+            while (coupon_index >= 0 && Math.Abs(coupon[coupon_index].PaymentTime - (t)) < 1e-10)
+            {
+                System.Diagnostics.Debug.WriteLine("{0} Coupon payments at {1}, t = {2}, dt = {3}",
+                    coupon_index, coupon[coupon_index].PaymentTime, t, dt);
+                for (int i = 0; i < space.Length; ++i)
+                {
+                    for (int j = 0; j < solution.Length; ++j)
+                        solution[j][i] += coupon[coupon_index].PaymentAmount * F;
+                }
+                coupon_index--;
+            }
+        }
+
+        /// <summary>
+        /// functions to get price
+        /// </summary>
+        public double DirtyPrice
+        {
+            get
+            {
+                if (!is_dirty_price || dirty_price == null)
+                {
+                    throw new InvalidOperationException("Dirty price has not been set");
+                }
+                else
+                {
+                    return (double)dirty_price;
+                }
+            }
+            set { dirty_price = value; }
+
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public double CleanPrice
+        {
+            get
+            {
+                if (is_dirty_price || clean_price == null)
+                {
+                    throw new InvalidOperationException("Clean price has not been set");
+                }
+                else
+                {
+                    return (double)clean_price;
+                }
+            }
+            set { clean_price = value; }
         }
 
         /// <summary>
@@ -378,10 +395,10 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
             //so that solver2 will be set to be null
             if (solver2 == null)
             {
-                solver2 = new ConvertibleBondPDEPricer(this);
+                solver2 = this.clone(); //virtual constructor
                 solver2.sigma = sigma * 1.01;
                 solver2.CreateAndSolvePDE();
-            }          
+            }
             double V_p = solver2.getPrice(S, t);
             double V = this.getPrice(S, t);
             return (V_p - V) / (0.01 * sigma);
@@ -392,13 +409,18 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
         {
 #if DEBUG
             //if directory not exist, create it
-            Directory.CreateDirectory(OutDir);
-            string CBoutput = OutDir + "/CBsol.txt";
-            string COCBoutput = OutDir + "/COCBsol.txt";
+            try
+            {
+                Directory.CreateDirectory(OutDir);
+            }
+            catch (Exception)
+            {
+                return;
+            }
             string TimeOutput = OutDir + "/time.txt";
 
-            printSolution(CBoutput, CB);
-            printSolution(COCBoutput, COCB);
+            for (int i = 0; i < solution.Length; ++i)
+                printSolution(OutDir + "/sol-" + i.ToString() + ".txt", solution[i]);
             printTimeStamp(TimeOutput, t);
 #endif
         }
@@ -416,12 +438,12 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
                 return 1.0 / 365;
             const double D = 1;
             double dnorm = 0.1;
-            double[] x = sol_list[sol_list.Count-1];
+            double[] x = sol_list[sol_list.Count - 1];
             double[] x_old = sol_list[sol_list.Count - 2];
             double min_ratio = double.MaxValue;
             for (int i = 0; i < x.Length; ++i)
             {
-                double tmp = dnorm / Math.Abs(x[i] - x_old[i]) 
+                double tmp = dnorm / Math.Abs(x[i] - x_old[i])
                            * Math.Max(D, Math.Max(Math.Abs(x[i]), Math.Abs(x_old[i])));
                 min_ratio = Math.Min(min_ratio, tmp);
             }
@@ -440,7 +462,7 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
             if (new_dt > dt)
                 return;
 
-            if (Math.Abs(dt1-new_dt) < 1e-15) //check if reaches print time
+            if (Math.Abs(dt1 - new_dt) < 1e-15) //check if reaches print time
             {
                 is_print_time = true;
                 print_time_count++;
@@ -450,6 +472,8 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
 
         private double computePutDt(double t, double dt)
         {
+            if (convertibleBondParams.PutSchedule == null)
+                return dt;
             var putSched = convertibleBondParams.PutSchedule.ToArray();
             double tmp_dt = dt;
             if (put_index < 0) // no schedule
@@ -462,7 +486,7 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
         }
 
         private double computeCouponDt(double t, double dt)
-        {
+        {   
             List<CouponParameters> coupon = convertibleBondParams.Coupons;
             if (coupon_index >= 0)
                 return t - coupon[coupon_index].PaymentTime;
@@ -470,11 +494,14 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
                 return dt;
         }
 
-        private void saveSolution(double time) {
+        /// <summary>
+        /// append solution at time t to solution space. 
+        /// currently save one solution and one 
+        /// </summary>
+        protected virtual void saveSolution() {
             //save one time solution to the solution space
-            solution.Add((double[])CB.Clone());
-            solution_aux.Add((double[])COCB.Clone());
-            this.time.Add(time);
+            solution_set.Add((double[])solution[0].Clone());
+            time.Add(t);
         }
 
         private double getPrice(double S, double[] sol)
@@ -547,17 +574,17 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
             //search in time grid, time is in descending order
             int j = time.BinarySearch(t, new DescendingOrder());
             double[] t_coef = new double[2];
-            int[] t_indx    = new int[2];
+            int[] t_indx = new int[2];
             LinearInterpolate(time, t, j, t_coef, t_indx);
 
             //search in space grid
             int i = Array.BinarySearch(space, S);
             double[] s_coef = new double[2];
-            int[] s_indx    = new int[2];
+            int[] s_indx = new int[2];
             LinearInterpolate(space, S, i, s_coef, s_indx);
 
-            double p1 = s_coef[0] * solution[t_indx[0]][s_indx[0]] + s_coef[1] * solution[t_indx[0]][s_indx[1]];
-            double p2 = s_coef[0] * solution[t_indx[1]][s_indx[0]] + s_coef[1] * solution[t_indx[1]][s_indx[1]];
+            double p1 = s_coef[0] * solution_set[t_indx[0]][s_indx[0]] + s_coef[1] * solution_set[t_indx[0]][s_indx[1]];
+            double p2 = s_coef[0] * solution_set[t_indx[1]][s_indx[0]] + s_coef[1] * solution_set[t_indx[1]][s_indx[1]];
 
             //interpolate in time
             return t_coef[0] * p1 + t_coef[1] * p2;
@@ -601,21 +628,32 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
             }
         }
 
-        static private double AccI(double t, List<CouponParameters> coupons)
+        private double AccI(double t, List<CouponParameters> coupons)
         {
+            if (is_dirty_price || coupons == null)
+                return 0.0;
+
+            double F = convertibleBondParams.FaceValue;
             for (int i = 1; i < coupons.Count; ++i)
             {
                 if (t >= coupons[i - 1].PaymentTime && t <= coupons[i].PaymentTime)
                 {
-                    return coupons[i].PaymentAmount 
-                            * (t - coupons[i - 1].PaymentTime) 
+                    return coupons[i].PaymentAmount * F
+                            * (t - coupons[i - 1].PaymentTime)
                             / (coupons[i].PaymentTime - coupons[i - 1].PaymentTime);
                 }
             }
             return 0;
         }
 
-        static void linspace(double[] x, double smin, double smax, int N)
+        /// <summary>
+        /// create N-vector start from smin to smax
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="smin"></param>
+        /// <param name="smax"></param>
+        /// <param name="N"></param>
+        protected void linspace(double[] x, double smin, double smax, int N)
         {
             double dx = (smax - smin) / (N - 1);
             for (int i = 0; i < N; ++i)
@@ -629,156 +667,391 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
         }
     }
 
-
     /// <summary>
-    /// Calibrator for PDE Convertible Bond pricer
-    /// calibrate volatility and credit spread
+    /// Price convertible bond using TF model, proposed in 
+    /// "KosTas Tsiveriotis And Chris Fernandes, Valuing Convertible Bonds with credit risk, 
+    /// The Journal of Fixed Income, 1998, 95--102."
     /// </summary>
-    public class ConvertibleBondPDECalibrator
+    public class TFPricer :  ConvertibleBondPDEPricer
     {
-        ConvertibleBondPDEPricer CBpricer;
-        double[] start;
-        double[] lowerBounds;
-        double[] upperBounds;
-        DoubleVector nm_x;
-        DoubleVector nm_y;
-        double[] solution;
-
+        private double[] CB;
+        private double[] COCB;
+        private double[] minus_rcB;
         /// <summary>
         /// Constructor
-        /// User is required to input convertibleBondpricer, stock price, bond price
-        /// initial guess, lower boundary and upper boundary of the parameters
         /// </summary>
-        /// <param name="CBpricer"></param>
-        /// <param name="xi"></param>
-        /// <param name="yi"></param>
-        /// <param name="start"></param>
-        /// <param name="lowerBounds"></param>
-        /// <param name="upperBounds"></param>
-        public ConvertibleBondPDECalibrator(
-            ConvertibleBondPDEPricer CBpricer,
-            double[] xi,
-            double[] yi,
-            double[] start,
-            double[] lowerBounds,
-            double[] upperBounds)
+        public TFPricer(ConvertibleBondParameters convertibleBondParams,
+                                            double conversionRatio,
+                                            double volatility,
+                                            Func<double, double> riskFree,
+                                            Func<double, double> growthRate,
+                                            Func<double, double> creditSpread,
+                                            bool isDirtyPrice = false) 
+            : base(convertibleBondParams, conversionRatio, volatility, riskFree, growthRate, creditSpread, isDirtyPrice)
         {
-            this.CBpricer = CBpricer;
-            this.start = start;
-            this.lowerBounds = lowerBounds;
-            this.upperBounds = upperBounds;
-            this.nm_x = new DoubleVector(xi);
-            this.nm_y = new DoubleVector(yi);
-            this.solution = new double[start.Length];
         }
 
         /// <summary>
-        /// main function
+        /// copy constructor
         /// </summary>
-        public void calibrate()
+        /// <param name="pricer"></param>
+        public TFPricer(TFPricer pricer) : base(pricer)
         {
-            var f = new CBCalFunc(CBpricer);
-            var start = new DoubleVector(this.start);
-            var lowerBounds = new DoubleVector(this.lowerBounds);
-            var upperBounds = new DoubleVector(this.upperBounds);
-            /*var fitter = new BoundedOneVariableFunctionFitter<TrustRegionMinimizer>( f );
-            DoubleVector res = fitter.Fit(nm_x, nm_y, start, lowerBounds, upperBounds);
-            System.Diagnostics.Debug.WriteLine("iters = {0}, init_rsd = {1}, fin_rsd = {2}", 
-                fitter.Minimizer.Iterations, fitter.Minimizer.InitialResidual, fitter.Minimizer.FinalResidual);
-            res.ToArray().CopyTo(solution, 0);*/
-
-            //try linear annealing method
-            LinearAnnealingSchedule schedule = new LinearAnnealingSchedule(4, 20, 100);
-            var minimizer = new AnnealingMinimizer(schedule);
-            minimizer.KeepHistory = true;
-            var min = minimizer.Minimize(f, start);
         }
 
-        double MyFunction(double parameters)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        override protected ConvertibleBondPDEPricer clone()
         {
-            double rsd = 0;
-
-            for (int i = 0; i < nm_x.Length; i++)
-
+            return new TFPricer(this);
         }
         /// <summary>
-        /// get the calibration results
+        /// set domain
         /// </summary>
-        /// <returns>calibrate parameters</returns>
-        public double[] getResults()
+        override protected void setDomain()
         {
-            return solution;
+            //setup space grid
+            CB = new double[GridSize];
+            COCB = new double[GridSize];
+            space = new double[GridSize];
+            minus_rcB = new double[GridSize];
+            solution = new double[2][];
+            solution[0] = CB;
+            solution[1] = COCB;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="V"></param>
+        /// <param name="i"></param>
+        protected override void constraints(double[][] V, int i)
+        {
+            double[] cb = V[0];
+            double[] cocb = V[1];
+            double[] x = space;
+            //upside constrain due to callability
+            if (space[i] < call_barr) //no call if equity price is below the call barrier
+                Bc = double.MaxValue;
+            if (cb[i] > Math.Max(Bc, kappa * x[i]))
+            {
+                cb[i] = Math.Max(Bc, kappa * x[i]);
+                cocb[i] = 0;
+            }
+
+            //downside constrain due to putability  
+            if (cb[i] < Bp)
+            {
+                cb[i] = Bp;
+                cocb[i] = Bp;
+            }
+
+            //upside constrain due to conversion
+            if (cb[i] < kappa * x[i])
+            {
+                cb[i] = kappa * x[i];
+                cocb[i] = 0;
+            }
+
+            //keep positivity
+            cb[i] = Math.Max(cb[i], 0.0);
+            cocb[i] = Math.Max(cocb[i], 0.0);
+        }
+        /// <summary>
+        /// create PDE and associated B.C.
+        /// </summary>
+        override protected void createPDE()
+        {
+            BlkScholes = new BlkSch[2];
+            double[] x = space;
+            int N = space.Length;
+            //construct Black Scholes equation for CB
+            BoundaryCondition[] CB_bc = new BoundaryCondition[2];
+            CB_bc[0] = new BoundaryCondition(); CB_bc[1] = new BoundaryCondition();
+            CB_bc[0].bc_type = BoundaryCondition.BC_Type.ZeroS;
+            CB_bc[1].bc_type = BoundaryCondition.BC_Type.LargeS;
+            CB_bc[1].bc_values[0] = kappa * x.Last();
+            Func<double, double, double> c2 = (t, s) => 0.5 * sigma * sigma;
+            Func<double, double, double> c1 = (t, s) => growthRate(t);
+            Func<double, double, double> c00 = (t, s) => -riskFree(t);
+            BlkScholes[0] = new BlkSch(CB, x, c2, c1, c00, minus_rcB, CB_bc);
+
+            //construct Black Scholes equation for COCB
+            BoundaryCondition[] COCB_bc = new BoundaryCondition[2];
+            COCB_bc[0] = new BoundaryCondition(); COCB_bc[1] = new BoundaryCondition();
+            COCB_bc[0].bc_type = BoundaryCondition.BC_Type.ZeroS;
+            COCB_bc[1].bc_type = BoundaryCondition.BC_Type.LargeS;
+            COCB_bc[1].bc_values[0] = 0;
+            Func<double, double, double> c01 = (t, s) => -(riskFree(t) + creditSpread(t));
+            BlkScholes[1] = new BlkSch(COCB, x, c2, c1, c01, null, COCB_bc);
+        }
+
+        /// <summary>
+        /// setup initial condition
+        /// </summary>
+        protected override void setInitialCondition()
+        {
+            //setup initial condition
+            linspace(space, 0, 5 * F, space.Length);
+            for (int i = 0; i < space.Length; ++i)
+            {
+                double[] x = space;
+                CB[i] = (kappa * x[i] >= F) ? kappa * x[i] : F;
+                COCB[i] = (kappa * x[i] >= F) ? 0.0 : F;
+            }
+        }
+
+        /// <summary>
+        /// compute source term for PDE
+        /// </summary>
+        protected override void computeSource()
+        {
+            //update source term
+            double rc = creditSpread(t);
+            for (int i = 0; i < space.Length; ++i)
+                minus_rcB[i] = -rc * COCB[i];
         }
     }
 
+    /// <summary>
+    /// Price convertible bond using AFV model, proposed in
+    /// "E. Ayache, P.A. Forsyth and K.R. Vetzal, The Valuation of Convertible Bonds with Credit Risk,
+    /// The Journal of Derivatives, 2003,  9-29"
+    /// </summary>
+    public class AFVPricer : ConvertibleBondPDEPricer
+    {
+        double[] CB; //solution
+        double[] source; //source term
+        double eta;  //default rate: 1 for total default, 0 for partial default
+        double R;    //recovery factor
+        double X;    //recovery value: Face value or predefault value
+        double alpha; //parameter in hazard rate model
+        double S0;     //spot price
+        double p0;   //hazard rate
+        Func<double, double, double> p; //hazard rate func
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        public AFVPricer(ConvertibleBondParameters convertibleBondParams,
+                                            double spotPrice,
+                                            double conversionRatio,
+                                            double volatility,
+                                            Func<double, double> riskFree,
+                                            Func<double, double> growthRate,
+                                            Func<double, double> creditSpread,
+                                            Func<double, double, double> hazardRateFunc = null,
+                                            double hazardRate = 0,
+                                            double defaultRate = 0,
+                                            double recoveryFactor = 0,
+                                            bool isDirtyPrice = false) 
+            : base(convertibleBondParams, conversionRatio, volatility, riskFree, growthRate, creditSpread, isDirtyPrice)
+        {
+            S0 = spotPrice;
+            R = recoveryFactor;
+            X = F;
+            p0 = hazardRate;
+            eta = defaultRate;
+            alpha = -1.2;
+            double eps = 1e-5;
+            if (hazardRateFunc != null)
+            {
+                p = hazardRateFunc;
+            }
+            else
+            {
+                if (S0 == 0)
+                    throw new DivideByZeroException("spot price cannot be zero");
+                p = (t, s) => p0 * Math.Pow( (s + eps)/S0, alpha);
+            }
+        }
+
+        /// <summary>
+        /// allocate memory for grids and solution space
+        /// </summary>
+        protected override void setDomain()
+        {
+            //setup space grid
+            CB = new double[GridSize];
+            space = new double[GridSize];
+            source = new double[GridSize];
+            solution = new double[1][];
+            solution[0] = CB;
+        }
+
+        /// <summary>
+        /// compute source term or sink term
+        /// </summary>
+        protected override void computeSource()
+        {
+            //update source term
+            for (int i = 0; i < space.Length; ++i)
+                source[i] = p(t, space[i]) * Math.Max(kappa * (1 - eta) *space[i], R * X);
+        }
+
+        /// <summary>
+        /// setup constraints for projected SOR
+        /// </summary>
+        /// <param name="V"></param>
+        /// <param name="i"></param>
+        protected override void constraints(double[][] V, int i)
+        {
+            double[] cb = V[0];
+            double[] x = space;
+            //upside constrain due to callability
+            if (space[i] < call_barr) //no call if equity price is below the call barrier
+                Bc = double.MaxValue;
+            if (cb[i] > Math.Max(Bc, kappa * x[i]))
+            {
+                cb[i] = Math.Max(Bc, kappa * x[i]);
+            }
+
+            //downside constrain due to putability  
+            if (cb[i] < Bp)
+            {
+                cb[i] = Bp;
+            }
+
+            //upside constrain due to conversion
+            if (cb[i] < kappa * x[i])
+            {
+                cb[i] = kappa * x[i];
+            }
+
+            //keep positivity
+            cb[i] = Math.Max(cb[i], 0.0);
+        }
+
+        /// <summary>
+        /// create PDE
+        /// </summary>
+        protected override void createPDE()
+        {
+            BlkScholes = new BlkSch[1];
+            double[] x = space;
+            int N = space.Length;
+            //construct Black Scholes equation for CB
+            BoundaryCondition[] CB_bc = new BoundaryCondition[2];
+            CB_bc[0] = new BoundaryCondition(); CB_bc[1] = new BoundaryCondition();
+            CB_bc[0].bc_type = BoundaryCondition.BC_Type.ZeroS;
+            CB_bc[1].bc_type = BoundaryCondition.BC_Type.LargeS;
+            CB_bc[1].bc_values[0] = kappa * x.Last();
+            Func<double, double, double> c2 = (t, s) => 0.5 * sigma * sigma;
+            Func<double, double, double> c1 = (t, s) => growthRate(t) + p(t,s)*eta;
+            Func<double, double, double> c00 = (t, s) => -(riskFree(t) + p(t,s));
+            BlkScholes[0] = new BlkSch(CB, x, c2, c1, c00, source, CB_bc);
+        }
+
+        /// <summary>
+        /// setup initial condition
+        /// </summary>
+        protected override void setInitialCondition()
+        {
+            //setup initial condition
+            linspace(space, 0, 5 * F, space.Length);
+            for (int i = 0; i < space.Length; ++i)
+            {
+                double[] x = space;
+                CB[i] = (kappa * x[i] >= F) ? kappa * x[i] : F;
+            }
+            System.Diagnostics.Debug.WriteLine(string.Join(",", CB));
+        }
+
+        private AFVPricer(AFVPricer pricer) : base(pricer)
+        {
+            CB = null;
+            source = null;
+            eta = pricer.eta;     //default rate: 1 for total default, 0 for partial default
+            R = pricer.R;         //recovery factor
+            X = pricer.X;         //recovery value: Face value or predefault value
+            alpha = pricer.alpha; //parameter in hazard rate model
+            S0 = pricer.S0;       //spot price
+            p0 = pricer.p0;       //hazard rate
+            p = pricer.p;         //hazard rate func
+        }
+
+        /// <summary>
+        /// virtual copy constructor
+        /// </summary>
+        /// <returns></returns>
+        protected override ConvertibleBondPDEPricer clone()
+        {
+            return new AFVPricer(this);
+        }
+    }
     /// <summary>
     /// 
     /// </summary>
-    class CBCalFunc : DoubleParameterizedFunction
+    public class BoundaryCondition
     {
-        ConvertibleBondPDEPricer CBpricer;
-        DoubleVector current_params;
         /// <summary>
-        /// Constructor
+        /// 
         /// </summary>
-        /// <param name="CBpricer"></param>
-        public CBCalFunc(ConvertibleBondPDEPricer CBpricer)
-        {
-            this.CBpricer = CBpricer;
-        }
-
+        public enum BC_Type {
+            /// <summary>
+            /// 
+            /// </summary>
+            ZeroS,
+            /// <summary>
+            /// 
+            /// </summary>
+            LargeS,
+            /// <summary>
+            /// 
+            /// </summary>
+            Dirichlet };
         /// <summary>
-        /// Evaluate function
+        /// 
         /// </summary>
-        /// <param name="param">optimize parameters</param>
-        /// <param name="x">input variable</param>
-        public override double Evaluate(DoubleVector param, double x)
-        {
-            System.Diagnostics.Debug.WriteLine("In Evaluation");
-            if (param.Length != 2) throw
-                new InvalidArgumentException( "parameters length should be 2" );
-            System.Diagnostics.Debug.WriteLine("new_params = {0}, {1}", param[0], param[1]);
-            if (current_params != null && current_params.Length == 2)
-            System.Diagnostics.Debug.WriteLine("cur_params = {0}, {1}", current_params[0], current_params[1]);
-            //if (current_params == null || param[0] != current_params[0] || param[1] != current_params[1])
-            //{
-                CBpricer.Volatility = param[0];
-                CBpricer.CreditSpread = param[1];
-                current_params = new DoubleVector(param);
-                CBpricer.CreateAndSolvePDE();
-            //}
-            return CBpricer.getPrice(x);
-        }
-    }
-
-    class BoundaryCondition
-    {
-        public enum BC_Type { ZeroS, LargeS, Dirichlet };
         public BC_Type bc_type = 0;
+        /// <summary>
+        /// 
+        /// </summary>
         public double[] bc_values = new double[4];
+        /// <summary>
+        /// 
+        /// </summary>
         public BoundaryCondition()
-        {}
+        {
+        }
     }
 
     /// <summary>
     /// parameters for Black-Scholes equation
     /// </summary>
-    class BlkSch
+    public class BlkSch
     {
-        public double[] sol;
-        public double[] x;
-        public double c2;
-        public double c1;
-        public double c0;
-        public double[] source;
+        /// <summary>
+        /// 
+        /// </summary>
+        public double[] sol, x, source;
+        /// <summary>
+        /// 
+        /// </summary>
+        public Func<double,double,double> c2, c1, c0;
+        /// <summary>
+        /// 
+        /// </summary>
         public BoundaryCondition[] bc;
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="sol"></param>
+        /// <param name="x"></param>
+        /// <param name="s2d2Vd2s"></param>
+        /// <param name="sdVds"></param>
+        /// <param name="V"></param>
+        /// <param name="source"></param>
+        /// <param name="bc"></param>
         public BlkSch(
                 double[] sol,
                 double[] x,
-                double s2d2Vd2s,
-                double sdVds,
-                double V,
+                Func<double,double,double> s2d2Vd2s,
+                Func<double,double,double> sdVds,
+                Func<double,double,double> V,
                 double[] source,
                 BoundaryCondition[] bc)
         {
@@ -811,7 +1084,7 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
         private double theta;   //0 for explicit, 1 for implicit, 0.5 for Crank Nicolson
         private double dt;
         private double min_dx;
-
+        private double t = 0;
         //for linear solver
         Action<double[][], int> constrain;
         enum DIR { UPPER, LOWER };
@@ -852,9 +1125,6 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
         {
             BoundaryCondition[] bc = BS.bc;
             double[] rhs = SPS.b;
-            double c2 = BS.c2;
-            double c1 = BS.c1;
-            double c0 = BS.c0;
             double[] x = BS.x;
             double[] sol = BS.sol;
             SPS.solution = BS.sol;
@@ -864,12 +1134,15 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
             applyBoundaryCondition(BS, bc[1], SPS.upper_bc, rhs, x, DIR.UPPER);
             for (int i = 1; i < n - 1; ++i)
             {
+                double c2 = BS.c2(t, x[i]);
+                double c1 = BS.c1(t, x[i]);
+                double c0 = BS.c0(t, x[i]);
                 //center in space
                 double alpha = 2 * c2 * x[i] * x[i] / ((x[i] - x[i - 1]) * (x[i + 1] - x[i - 1])) - c1 * x[i] / (x[i + 1] - x[i - 1]);
                 double beta = 2 * c2 * x[i] * x[i] / ((x[i + 1] - x[i]) * (x[i + 1] - x[i - 1])) + c1 * x[i] / (x[i + 1] - x[i - 1]);
 
                 //using upwind scheme insead of center in space to elminate oscillation near discontinuities
-                /*if (c1 * x[i] > 0)
+                if (c1 * x[i] > 0)
                 {
                     alpha = 2 * c2 * x[i] * x[i] / ((x[i] - x[i - 1]) * (x[i + 1] - x[i - 1]));
                     beta = 2 * c2 * x[i] * x[i] / ((x[i + 1] - x[i]) * (x[i + 1] - x[i - 1])) + c1 * x[i] / (x[i + 1] - x[i]);
@@ -878,7 +1151,7 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
                 {
                     alpha = 2 * c2 * x[i] * x[i] / ((x[i] - x[i - 1]) * (x[i + 1] - x[i - 1])) - c1 * x[i] / (x[i] - x[i - 1]);
                     beta = 2 * c2 * x[i] * x[i] / ((x[i + 1] - x[i]) * (x[i + 1] - x[i - 1]));
-                }*/
+                }
                 
                 SPS.L[i - 1] = -alpha * theta * dt;
                 SPS.D[i - 1] = 1 + (alpha + beta - c0) * theta * dt;
@@ -891,9 +1164,10 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
             }
         }
 
-        public void advance(double dt)
+        public void advance(double t, double dt)
         {
             this.dt = dt;
+            this.t = t;
             SparseLinearSystem[] sps = new SparseLinearSystem[bs.Length];
             for (int i = 0; i < bs.Length; ++i)
             {
@@ -903,7 +1177,7 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
 
             PSOR psor_solver = new PSOR(sps, 1.55, constrain);
             psor_solver.tolerance = 1e-5;
-            psor_solver.maxIter = 200;
+            psor_solver.maxIter = 400;
             psor_solver.solve();
             NumIter = psor_solver.NumIter;
             ErrorNorm = psor_solver.ErrorNorm;
@@ -915,16 +1189,16 @@ namespace Axioma.Phoenix.Platform.MathsLayer.SecurityPricingHelpers.PDEFramework
             {
                 case BoundaryCondition.BC_Type.ZeroS:
                     if (dir == DIR.UPPER)
-                        throw new InvalidEnumArgumentException("Cannot use zero boundary on upper side");
-                    coef[0] = 1 - bs.c0 * theta * dt;
-                    rhs[0] = (1 + bs.c0 * (1 - theta) * dt) * bs.sol[0];
+                        throw new InvalidArgumentException("Cannot use zero boundary on upper side");
+                    coef[0] = 1 - bs.c0(t,x[0]) * theta * dt;
+                    rhs[0] = (1 + bs.c0(t,x[0]) * (1 - theta) * dt) * bs.sol[0];
                     if (bs.source != null)
                         rhs[0] += bs.source[0] * dt;
                     break;
                 case BoundaryCondition.BC_Type.LargeS:
                     if (dir == DIR.LOWER)
                     {
-                        throw new InvalidEnumArgumentException("Cannot use large s boundary on lower side");
+                        throw new InvalidArgumentException("Cannot use large s boundary on lower side");
                     }
                     else
                     {

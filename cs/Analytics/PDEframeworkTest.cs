@@ -704,43 +704,55 @@ namespace Axioma.Phoenix.Valuation.Framework.Tests
         [TestMethod, TestCategory(TestCategories.Valuation), TestCategory(TestCategories.Pricers_Axioma)]
         public void ConvertibleBondPricerTest()
         {
-            //hard-coding parameters below, please change if necessary
+            //hardcoding parameters below, please change if necessary
             double sigma = 0.2;         // volatility
             double T = 5;               // time to expiry (years)
             double kappa = 1.0;         // conversion ratio
             double B = 100;             // principal
-            double rc = 0.02;           // credit spread
 
             Func<double, double> r = (t) => 0.05;       // risk-free interest rate
-            Func<double, double> rg = (t) => 0.02;      // growth rate of stock
+            Func<double, double> rg = (t) => 0.05;      // growth rate of stock
+            Func<double, double> rc = (t) => 0.02;      // credit spread
 
             //call schedule
             OptionalityPeriodParameters[] callScheduleArray = new OptionalityPeriodParameters[1];
-            callScheduleArray[0] = new OptionalityPeriodParameters(1, 5, 110);
+            callScheduleArray[0] = new OptionalityPeriodParameters(2, 5, 1.1);
             System.Collections.Generic.IEnumerable<OptionalityPeriodParameters> CallSchedule = callScheduleArray;
 
             //put scheule
             OptionalityPeriodParameters[] putScheduleArray = new OptionalityPeriodParameters[1];
-            putScheduleArray[0] = new OptionalityPeriodParameters(2, 3, 105);
+            putScheduleArray[0] = new OptionalityPeriodParameters(3, 3, 1.05);
             System.Collections.Generic.IEnumerable<OptionalityPeriodParameters> PutSchedule = putScheduleArray;
 
             //coupon payments
             System.Collections.Generic.List<CouponParameters> Coupons = new System.Collections.Generic.List<CouponParameters>();
             for (int i = 0; i < 10; ++i)
-                Coupons.Add(new CouponParameters(0, T, 0.5 + i * 0.5, 4));
+                Coupons.Add(new CouponParameters(0, T, 0.5 + i * 0.5, 4/B));
 
             //callable bond parameter
             Pricers.Convertible.ConvertibleBondParameters cparams = new Pricers.Convertible.ConvertibleBondParameters();
             cparams.Maturity = T;
             cparams.FaceValue = B;
             cparams.CallSchedule = CallSchedule;
-            cparams.PutSchedule = PutSchedule;
+            cparams.PutSchedule = null;// PutSchedule;
             cparams.Coupons = Coupons;
 
             //measure excution time
             for (int it = 4; it <= 4; it++ )
             {
-                ConvertibleBondPDEPricer CBSolver = new ConvertibleBondPDEPricer(cparams, kappa, sigma, rc, r, rg);
+                ConvertibleBondPDEPricer CBSolver = new TFPricer(cparams, kappa, sigma, r, rg, rc);
+                /*ConvertibleBondPDEPricer CBSolver = new AFVPricer(cparams, 
+                                                                  spotPrice : B, 
+                                                                  conversionRatio: kappa, 
+                                                                  volatility: sigma, 
+                                                                  riskFree: r, 
+                                                                  growthRate: rg, 
+                                                                  creditSpread: rc, 
+                                                                  hazardRateFunc: null, 
+                                                                  hazardRate: 0.02, 
+                                                                  defaultRate: 1, 
+                                                                  recoveryFactor: 0, 
+                                                                  isDirtyPrice: false);*/
                 CBSolver.print_time_interval = 0.1;
                 CBSolver.OutDir = "D:";
                 CBSolver.GridSize = it*200;
@@ -761,72 +773,6 @@ namespace Axioma.Phoenix.Valuation.Framework.Tests
                     stream.WriteLine("{0} {1}", CBSolver.GridSize, ans);
                 }
             }
-        }
-
-        [TestMethod, TestCategory(TestCategories.Valuation), TestCategory(TestCategories.Pricers_Axioma)]
-        public void ConvertibleBondCalibratorTest()
-        {
-            #region initialize solver
-            //hard-coding parameters below, please change if necessary
-            double sigma = 0.2;         // volatility
-            double T = 5;               // time to expiry (years)
-            double kappa = 1.0;         // conversion ratio
-            double B = 100;             // principal
-            double rc = 0.02;           // credit spread
-
-            Func<double, double> r = (t) => 0.05;       // risk-free interest rate
-            Func<double, double> rg = (t) => 0.02;      // growth rate of stock
-
-            //call schedule
-            OptionalityPeriodParameters[] callScheduleArray = new OptionalityPeriodParameters[1];
-            callScheduleArray[0] = new OptionalityPeriodParameters(1, 5, 110);
-            System.Collections.Generic.IEnumerable<OptionalityPeriodParameters> CallSchedule = callScheduleArray;
-
-            //put scheule
-            OptionalityPeriodParameters[] putScheduleArray = new OptionalityPeriodParameters[1];
-            putScheduleArray[0] = new OptionalityPeriodParameters(2, 3, 105);
-            System.Collections.Generic.IEnumerable<OptionalityPeriodParameters> PutSchedule = putScheduleArray;
-
-            //coupon payments
-            System.Collections.Generic.List<CouponParameters> Coupons = new System.Collections.Generic.List<CouponParameters>();
-            for (int i = 0; i < 10; ++i)
-                Coupons.Add(new CouponParameters(0, T, 0.5 + i * 0.5, 4));
-
-            //callable bond parameter
-            Pricers.Convertible.ConvertibleBondParameters cparams = new Pricers.Convertible.ConvertibleBondParameters();
-            cparams.Maturity = T;
-            cparams.FaceValue = B;
-            cparams.CallSchedule = CallSchedule;
-            cparams.PutSchedule = PutSchedule;
-            cparams.Coupons = Coupons;
-
-            ConvertibleBondPDEPricer CBSolver = new ConvertibleBondPDEPricer(cparams, kappa, sigma, rc, r, rg);
-            CBSolver.print_time_interval = 0.1;
-            CBSolver.OutDir = "D:";
-            CBSolver.GridSize = 200;
-            CBSolver.CreateAndSolvePDE();
-            #endregion
-
-            #region generate test data
-            int N = 20;
-            double[] s = new double[N];
-            double[] prices = new double[N];
-            for (int i = 0; i < s.Length; ++i)
-            {
-                s[i] = i * 10;
-                prices[i] = CBSolver.getPrice(s[i], 0);
-            }
-            #endregion
-
-            double eps = 1e-3;
-            double[] start = new double[2] { sigma*0.8, rc*1.2};
-            double[] lower = new double[2] { eps, eps};
-            double[] upper = new double[2] { 1.0, 0.1 };
-            ConvertibleBondPDECalibrator CBCal = new ConvertibleBondPDECalibrator(CBSolver, s, prices, start, lower, upper);
-            CBCal.calibrate();
-            double[] ans = CBCal.getResults();
-            System.Diagnostics.Debug.WriteLine("Original Parameters are: {0}, {1}", sigma, rc);
-            System.Diagnostics.Debug.WriteLine("Calibrate Parameters are: {0}, {1}", ans[0], ans[1]);
         }
     }
 }

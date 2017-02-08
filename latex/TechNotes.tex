@@ -251,7 +251,7 @@ and
 Using $U = E + V$ yields
 \begin{equation*}
 \frac{\partial{U}}{\partial{t}} + 
-\frac{\sigma^2S^2}{2}\frac{\partial^2{U}}{\partial{S}^2} + rS\frac{\partial{U}}{\partial{S}} - rU + r_cV + P(t) = 0 
+\frac{\sigma^2S^2}{2}\frac{\partial^2{U}}{\partial{S}^2} + rS\frac{\partial{U}}{\partial{S}} - rU - r_cV + P(t) = 0 
 \end{equation*}
 \subsection{Derivation of AFV model}
 Similar as the TF model, the AFV model can be derived by introducing the probability of default $p$. Assuming the stock price goes to $S(1-\eta)$ after default, then the bond holder has the option of receiving $RX-B$ or $\kappa S(1-\eta)$. Applying the Black Scholes argument to the portfolio $\Pi = U + \Delta S$ gives
@@ -260,7 +260,7 @@ d\Pi = (1-pdt)(\frac{\partial U}{\partial t} + \frac{1}{2}\sigma^2S^2\frac{\part
 \end{equation*}
 In the meanwhile, assumption of diversifiable default risk implies
 \begin{equation*}
-E(d\Pi) = r(t)\Pi dt
+d\Pi = r(t)\Pi dt
 \end{equation*}
 Then
 \begin{equation*}
