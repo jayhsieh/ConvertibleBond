@@ -209,7 +209,7 @@ The time cost is almost quadratic $O(N^2)$ on grid size $N$ since increasing the
 \centering
 \includegraphics[width=0.45\textwidth]{Figures/timecost}
 \includegraphics[width=0.45\textwidth]{Figures/converge}
-\caption{Time cost on computational grid size (left) and convergence of bond price (right). The test is performed on both debug version and release version.}
+\caption{Time cost on computational grid size for TF model(left) and convergence of bond price on both TF model and AFV model(right). The test is performed on both debug version and release version.}
 \label{fig:time_cost}
 \end{figure}
 
@@ -228,7 +228,7 @@ p(S) = p_0(\frac{S}{S_0})^\alpha
 \end{equation}
 Typical values for $\alpha$ are in the range from $-1.2$ to $-2.0$.
 
-It is easy to see that the above PDE can be directly solved using the proposed PDE framework, where $c_2 = \sigma^2/2$, $c_1 = r(t)+ p$ and $c_0 = -(r(t)+p)$, and source term equals to $p\max(\kappa S(1-\eta), RX)$. The rest procedures are exactly the same as in TF model. Figure \ref{fig:AFV_TF} provides a comparison between the results of AFV model and TF model. The AFV model uses parameters $\alpha = -1.2$, $p_0 = 0.02$, $\eta = 1$, and $R = 0$. Unlike the TF model, the bond price of the AFV can breaks through the bond floor as the underlying approaches zero. This is exactly the result of including the default model.
+It is easy to see that the above PDE can be directly solved using the proposed PDE framework, where $c_2 = \sigma^2/2$, $c_1 = r(t)+ p$ and $c_0 = -(r(t)+p)$, and source term equals to $p\max(\kappa S(1-\eta), RX)$. The rest procedures are exactly the same as in TF model. Figure \ref{fig:AFV_TF} provides a comparison between the results of AFV model and TF model. The AFV model uses parameters $\alpha = -1.2$, $p_0 = 0.02$, $\eta = 1$, and $R = 0$. Unlike the TF model, the bond price of the AFV can breaks through the bond floor and approach to the recovery price as the underlying goes to zero. This is exactly the result of including the default model.
 
 \begin{figure}[!htbp]
 \centering
@@ -242,11 +242,11 @@ It is easy to see that the above PDE can be directly solved using the proposed P
 \subsection{Derivation of TF model}
 According to the TF model, we can split the CB value to the equity value $E$ and cash only part $V$: $U = V + E$. Assuming $E$ is risk free and $V$ has a credit risk $r_c$, applying Black Scholes arguments to portfolio $\Pi_1 = E + \Delta_1 S$ and $\Pi_2 = V + \Delta_2 S$ gives
 \begin{equation*}
-(\frac{\partial E}{\partial t} + \frac{1}{2}\sigma^2S^2\frac{\partial^2E}{\partial S^2})dt = d\Pi_1 = r(E - \frac{\partial E}{\partial t}S)dt
+(\frac{\partial E}{\partial t} + \frac{1}{2}\sigma^2S^2\frac{\partial^2E}{\partial S^2})dt = d\Pi_1 = r(E - \frac{\partial E}{\partial S}S)dt
 \end{equation*}
 and
 \begin{equation*}
-(\frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2S^2\frac{\partial^2V}{\partial S^2} + P(t))dt = d\Pi_2 = (r+r_c)Vdt - r\frac{\partial V}{\partial t}Sdt
+(\frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2S^2\frac{\partial^2V}{\partial S^2} + P(t))dt = d\Pi_2 = (r+r_c)Vdt - r\frac{\partial V}{\partial S}Sdt
 \end{equation*}
 Using $U = E + V$ yields
 \begin{equation*}
